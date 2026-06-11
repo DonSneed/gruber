@@ -1,10 +1,14 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthProvider'
 import { useAuth } from './hooks/useAuth'
+import { AppLayout } from './components/AppLayout'
 import { Login } from './pages/Login'
 import { Signup } from './pages/Signup'
 import { Onboarding } from './pages/Onboarding'
-import { Home } from './pages/Home'
+import { Today } from './pages/Today'
+import { Stories } from './pages/Stories'
+import { StoryDetail } from './pages/StoryDetail'
+import { CalendarPage } from './pages/CalendarPage'
 
 function AppRoutes() {
   const { loading } = useAuth()
@@ -22,7 +26,12 @@ function AppRoutes() {
       <Route path="/login" element={<Login />} />
       <Route path="/signup" element={<Signup />} />
       <Route path="/onboarding" element={<Onboarding />} />
-      <Route path="/" element={<Home />} />
+      <Route element={<AppLayout />}>
+        <Route path="/" element={<Today />} />
+        <Route path="/stories" element={<Stories />} />
+        <Route path="/stories/:id" element={<StoryDetail />} />
+        <Route path="/calendar" element={<CalendarPage />} />
+      </Route>
     </Routes>
   )
 }
