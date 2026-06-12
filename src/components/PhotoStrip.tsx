@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Trash2 } from 'lucide-react'
 import { deletePhoto, getPhotoUrl, listPhotos, uploadPhoto } from '../lib/photos'
 import type { Photo } from '../lib/photos'
 
@@ -7,9 +8,10 @@ interface PhotoStripProps {
   profileId: string
   storyId?: string
   taskId?: string
+  eventId?: string
 }
 
-export function PhotoStrip({ familyId, profileId, storyId, taskId }: PhotoStripProps) {
+export function PhotoStrip({ familyId, profileId, storyId, taskId, eventId }: PhotoStripProps) {
   const [photos, setPhotos] = useState<Photo[]>([])
   const [urls, setUrls] = useState<Record<string, string>>({})
   const [uploading, setUploading] = useState(false)
@@ -18,10 +20,10 @@ export function PhotoStrip({ familyId, profileId, storyId, taskId }: PhotoStripP
 
   useEffect(() => {
     load()
-  }, [storyId, taskId])
+  }, [storyId, taskId, eventId])
 
   async function load() {
-    const data = await listPhotos({ storyId, taskId })
+    const data = await listPhotos({ storyId, taskId, eventId })
     setPhotos(data)
 
     const entries = await Promise.all(
@@ -37,7 +39,7 @@ export function PhotoStrip({ familyId, profileId, storyId, taskId }: PhotoStripP
     setUploading(true)
     setError(null)
     try {
-      await uploadPhoto(file, familyId, profileId, { storyId, taskId })
+      await uploadPhoto(file, familyId, profileId, { storyId, taskId, eventId })
       await load()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Upload failed')
@@ -69,10 +71,10 @@ export function PhotoStrip({ familyId, profileId, storyId, taskId }: PhotoStripP
             )}
             <button
               onClick={() => handleDelete(photo)}
-              className="absolute right-0.5 top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-ink/60 text-xs text-white opacity-0 group-hover:opacity-100"
+              className="absolute right-0.5 top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-ink/60 text-white opacity-0 group-hover:opacity-100"
               title="Delete photo"
             >
-              &times;
+              <Trash2 className="h-3 w-3" />
             </button>
           </div>
         ))}

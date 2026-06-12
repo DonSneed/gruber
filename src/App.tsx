@@ -8,6 +8,8 @@ import { Onboarding } from './pages/Onboarding'
 import { Today } from './pages/Today'
 import { Stories } from './pages/Stories'
 import { StoryDetail } from './pages/StoryDetail'
+import { TaskDetail } from './pages/TaskDetail'
+import { EventDetail } from './pages/EventDetail'
 import { CalendarPage } from './pages/CalendarPage'
 import { Settings } from './pages/Settings'
 import { SettingsMembers } from './pages/SettingsMembers'
@@ -34,6 +36,8 @@ function AppRoutes() {
         <Route path="/" element={<Today />} />
         <Route path="/stories" element={<Stories />} />
         <Route path="/stories/:id" element={<StoryDetail />} />
+        <Route path="/tasks/:id" element={<TaskDetail />} />
+        <Route path="/events/:id" element={<EventDetail />} />
         <Route path="/calendar" element={<CalendarPage />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/settings/members" element={<SettingsMembers />} />

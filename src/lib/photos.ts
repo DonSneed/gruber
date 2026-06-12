@@ -5,6 +5,7 @@ export interface Photo {
   family_id: string
   story_id: string | null
   task_id: string | null
+  event_id: string | null
   storage_path: string
   created_by: string | null
   created_at: string
@@ -54,7 +55,7 @@ export async function uploadPhoto(
   file: File,
   familyId: string,
   profileId: string,
-  target: { storyId?: string; taskId?: string },
+  target: { storyId?: string; taskId?: string; eventId?: string },
 ): Promise<void> {
   const blob = await compressImage(file)
   const path = `${familyId}/${crypto.randomUUID()}.jpg`
@@ -68,16 +69,18 @@ export async function uploadPhoto(
     family_id: familyId,
     story_id: target.storyId ?? null,
     task_id: target.taskId ?? null,
+    event_id: target.eventId ?? null,
     storage_path: path,
     created_by: profileId,
   })
   if (insertError) throw insertError
 }
 
-export async function listPhotos(filter: { storyId?: string; taskId?: string }): Promise<Photo[]> {
+export async function listPhotos(filter: { storyId?: string; taskId?: string; eventId?: string }): Promise<Photo[]> {
   let query = supabase.from('photos').select('*').order('created_at', { ascending: false })
   if (filter.storyId) query = query.eq('story_id', filter.storyId)
   if (filter.taskId) query = query.eq('task_id', filter.taskId)
+  if (filter.eventId) query = query.eq('event_id', filter.eventId)
   const { data } = await query
   return data ?? []
 }

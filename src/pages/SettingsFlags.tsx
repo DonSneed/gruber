@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link } from 'react-router-dom'
+import { Trash2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { FLAG_COLORS } from '../lib/flags'
@@ -70,10 +71,10 @@ export function SettingsFlags() {
                 </span>
                 <button
                   onClick={() => deleteFlag(flag.id)}
-                  className="shrink-0 text-xs text-stone hover:text-red-600"
+                  className="shrink-0 text-stone hover:text-red-600"
                   title="Delete flag"
                 >
-                  &times;
+                  <Trash2 className="h-3.5 w-3.5" />
                 </button>
               </li>
             ))}

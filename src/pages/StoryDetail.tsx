@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
-import { Clock, Image as ImageIcon, Repeat, X } from 'lucide-react'
+import { Clock, Image as ImageIcon, Repeat, StickyNote, Trash2, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { Collapse } from '../components/Collapse'
 import { FlagPicker } from '../components/FlagPicker'
 import { dateString, formatDateTime, toTimeInput } from '../lib/date'
 import { PhotoStrip } from '../components/PhotoStrip'
+import { NoteList } from '../components/NoteList'
 import { createRecurringTask, DAY_LABELS, materializeRecurringTasks } from '../lib/recurring'
 import type { Flag, Profile, Story, Task, TaskAssignee, TaskFlag } from '../lib/types'
 
@@ -39,6 +40,7 @@ export function StoryDetail() {
   const [scheduleEnd, setScheduleEnd] = useState('')
 
   const [photosTaskId, setPhotosTaskId] = useState<string | null>(null)
+  const [notesTaskId, setNotesTaskId] = useState<string | null>(null)
 
   useEffect(() => {
     if (id) load(id)
@@ -278,9 +280,10 @@ export function StoryDetail() {
             </button>
             <button
               onClick={deleteStory}
-              className="rounded border border-on-page/30 px-3 py-1 text-xs font-medium text-on-page/80 hover:bg-red-600 hover:text-white hover:border-red-600"
+              className="rounded border border-on-page/30 p-1.5 text-on-page/80 hover:border-red-600 hover:bg-red-600 hover:text-white"
+              title="Delete story"
             >
-              Delete
+              <Trash2 className="h-4 w-4" />
             </button>
           </div>
         </div>
@@ -331,9 +334,10 @@ export function StoryDetail() {
                   </div>
                   <button
                     onClick={() => deleteTask(task.id)}
-                    className="text-xs text-stone hover:text-red-600"
+                    className="text-stone hover:text-red-600"
+                    title="Delete task"
                   >
-                    Delete
+                    <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 </div>
 
@@ -376,6 +380,15 @@ export function StoryDetail() {
                     }`}
                   >
                     <ImageIcon className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    onClick={() => setNotesTaskId(notesTaskId === task.id ? null : task.id)}
+                    title="Notes"
+                    className={`rounded p-1 ${
+                      notesTaskId === task.id ? 'bg-forest text-white' : 'hover:bg-stone/10 hover:text-forest'
+                    }`}
+                  >
+                    <StickyNote className="h-3.5 w-3.5" />
                   </button>
                   <FlagPicker
                     flags={flags}
@@ -420,6 +433,19 @@ export function StoryDetail() {
                   {profile && (
                     <div className="ml-6">
                       <PhotoStrip familyId={profile.family_id} profileId={profile.id} taskId={task.id} />
+                    </div>
+                  )}
+                </Collapse>
+
+                <Collapse open={notesTaskId === task.id}>
+                  {profile && (
+                    <div className="ml-6">
+                      <NoteList
+                        familyId={profile.family_id}
+                        profileId={profile.id}
+                        taskId={task.id}
+                        members={members}
+                      />
                     </div>
                   )}
                 </Collapse>
@@ -515,6 +541,13 @@ export function StoryDetail() {
         <div className="rounded-lg bg-cream p-4 text-ink shadow">
           <h2 className="mb-2 font-medium">Memories</h2>
           {profile && <PhotoStrip familyId={profile.family_id} profileId={profile.id} storyId={story.id} />}
+        </div>
+
+        <div className="rounded-lg bg-cream p-4 text-ink shadow">
+          <h2 className="mb-2 font-medium">Notes</h2>
+          {profile && (
+            <NoteList familyId={profile.family_id} profileId={profile.id} storyId={story.id} members={members} />
+          )}
         </div>
       </div>
     </div>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link } from 'react-router-dom'
+import { Trash2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import type { Story, TaskStatus } from '../lib/types'
@@ -127,10 +128,10 @@ function StoryColumn({
                 e.stopPropagation()
                 onDelete(story.id)
               }}
-              className="absolute right-3 top-3 text-xs text-stone hover:text-red-600"
+              className="absolute right-3 top-3 text-stone hover:text-red-600"
               title="Delete story"
             >
-              &times;
+              <Trash2 className="h-3.5 w-3.5" />
             </button>
             <h3 className="pr-4 font-medium">{story.title}</h3>
             {total > 0 && (

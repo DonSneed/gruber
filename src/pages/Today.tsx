@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link } from 'react-router-dom'
-import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Clock, Repeat } from 'lucide-react'
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Clock, Repeat, Trash2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { Collapse } from '../components/Collapse'
@@ -474,13 +474,12 @@ export function Today() {
                         className="h-4 w-4 shrink-0 accent-forest"
                       />
                       <span className={`flex-1 text-sm ${item.status === 'done' ? 'text-stone line-through' : ''}`}>
-                        {item.storyId ? (
-                          <Link to={`/stories/${item.storyId}`} className="hover:underline">
-                            {item.title}
-                          </Link>
-                        ) : (
-                          item.title
-                        )}
+                        <Link
+                          to={item.storyId ? `/stories/${item.storyId}` : `/tasks/${item.id}`}
+                          className="hover:underline"
+                        >
+                          {item.title}
+                        </Link>
                       </span>
                       <span className="inline-flex gap-1">
                         {item.assigneeIds.map((id) => (
@@ -497,10 +496,10 @@ export function Today() {
                       />
                       <button
                         onClick={() => deleteTask(item.id)}
-                        className="shrink-0 text-xs text-stone hover:text-red-600"
+                        className="shrink-0 text-stone hover:text-red-600"
                         title="Delete task"
                       >
-                        &times;
+                        <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     </li>
                   ))}
@@ -547,13 +546,14 @@ export function Today() {
                 if (item.kind === 'event') {
                   const color = colorForProfile(item.ownerId, memberIds)
                   return (
-                    <div
+                    <Link
                       key={`event-${item.id}`}
-                      className={`absolute overflow-hidden rounded px-1.5 py-0.5 text-xs ${color.bg} ${color.text}`}
+                      to={`/events/${item.id}`}
+                      className={`absolute block overflow-hidden rounded px-1.5 py-0.5 text-xs hover:underline ${color.bg} ${color.text}`}
                       style={style}
                     >
                       <span className="font-medium">{formatTime(item.start)}</span> {item.title}
-                    </div>
+                    </Link>
                   )
                 }
 
@@ -570,13 +570,12 @@ export function Today() {
                       className="h-3 w-3 shrink-0 accent-forest"
                     />
                     <span className={`truncate ${item.status === 'done' ? 'text-stone line-through' : ''}`}>
-                      {item.storyId ? (
-                        <Link to={`/stories/${item.storyId}`} className="hover:underline">
-                          {item.title}
-                        </Link>
-                      ) : (
-                        item.title
-                      )}
+                      <Link
+                        to={item.storyId ? `/stories/${item.storyId}` : `/tasks/${item.id}`}
+                        className="hover:underline"
+                      >
+                        {item.title}
+                      </Link>
                     </span>
                     <span className="ml-auto inline-flex shrink-0 gap-0.5">
                       {item.assigneeIds.map((id) => (

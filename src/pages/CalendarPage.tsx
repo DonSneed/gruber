@@ -171,18 +171,20 @@ export function CalendarPage() {
                           {item.start ? formatTime(item.start) : ''}
                         </span>
                         {item.kind === 'event' ? (
-                          <span className={`flex-1 rounded px-2 py-1 text-sm ${color.bg} ${color.text}`}>
+                          <Link
+                            to={`/events/${item.id}`}
+                            className={`flex-1 rounded px-2 py-1 text-sm hover:underline ${color.bg} ${color.text}`}
+                          >
                             {item.title}
-                          </span>
+                          </Link>
                         ) : (
                           <span className={`flex-1 text-sm ${item.done ? 'text-stone line-through' : ''}`}>
-                            {item.storyId ? (
-                              <Link to={`/stories/${item.storyId}`} className="hover:underline">
-                                {item.title}
-                              </Link>
-                            ) : (
-                              item.title
-                            )}
+                            <Link
+                              to={item.storyId ? `/stories/${item.storyId}` : `/tasks/${item.id}`}
+                              className="hover:underline"
+                            >
+                              {item.title}
+                            </Link>
                             <span className="ml-2 inline-flex gap-1">
                               {item.assigneeIds.map((id) => (
                                 <span
