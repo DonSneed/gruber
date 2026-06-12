@@ -1,137 +1,323 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
-import type { Profile, ProfileRole } from '../lib/types'
+import { colorForProfile } from '../lib/colors'
+import { dateString, endOfDay, formatTime, startOfDay } from '../lib/date'
+import type { Event, Profile, Story, Task, TaskAssignee } from '../lib/types'
+
+type TimelineItem =
+  | { kind: 'event'; id: string; title: string; start: string; ownerId: string | null }
+  | {
+      kind: 'task'
+      id: string
+      title: string
+      start: string
+      assigneeIds: string[]
+      done: boolean
+      storyId: string | null
+    }
 
 export function Today() {
   const { profile } = useAuth()
-  const [inviteCode, setInviteCode] = useState<string | null>(null)
-  const [inviteError, setInviteError] = useState<string | null>(null)
-  const [generating, setGenerating] = useState(false)
-
   const [members, setMembers] = useState<Profile[]>([])
-  const [newMemberName, setNewMemberName] = useState('')
-  const [newMemberRole, setNewMemberRole] = useState<ProfileRole>('child')
-  const [addingMember, setAddingMember] = useState(false)
-  const [memberError, setMemberError] = useState<string | null>(null)
+  const [stories, setStories] = useState<Story[]>([])
+  const [events, setEvents] = useState<Event[]>([])
+  const [scheduledTasks, setScheduledTasks] = useState<Task[]>([])
+  const [unscheduledTasks, setUnscheduledTasks] = useState<Task[]>([])
+  const [assignees, setAssignees] = useState<TaskAssignee[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const [eventTitle, setEventTitle] = useState('')
+  const [eventStart, setEventStart] = useState('09:00')
+  const [eventEnd, setEventEnd] = useState('10:00')
+  const [addingEvent, setAddingEvent] = useState(false)
+  const [eventError, setEventError] = useState<string | null>(null)
+
+  const [newTask, setNewTask] = useState('')
+  const [newTaskStoryId, setNewTaskStoryId] = useState('')
+  const [addingTask, setAddingTask] = useState(false)
 
   useEffect(() => {
-    loadMembers()
+    load()
   }, [])
 
-  async function loadMembers() {
-    const { data } = await supabase.from('profiles').select('*').order('created_at')
-    if (data) setMembers(data)
-  }
+  async function load() {
+    setLoading(true)
+    const now = new Date()
+    const todayStr = dateString(now)
+    const dayStart = startOfDay(now).toISOString()
+    const dayEnd = endOfDay(now).toISOString()
+    const [membersRes, storiesRes, eventsRes, scheduledRes, unscheduledRes] = await Promise.all([
+      supabase.from('profiles').select('*').order('created_at'),
+      supabase.from('stories').select('*').eq('status', 'active').order('created_at'),
+      supabase.from('events').select('*').gte('start', dayStart).lte('start', dayEnd).order('start'),
+      supabase
+        .from('tasks')
+        .select('*')
+        .gte('scheduled_start', dayStart)
+        .lte('scheduled_start', dayEnd)
+        .order('scheduled_start'),
+      supabase.from('tasks').select('*').eq('due_date', todayStr).is('scheduled_start', null).order('created_at'),
+    ])
 
-  async function handleGenerateInvite() {
-    setInviteError(null)
-    setGenerating(true)
-    const { data, error } = await supabase.rpc('create_invite')
-    if (error) {
-      setInviteError(error.message)
+    const loadedScheduled = scheduledRes.data ?? []
+    const loadedUnscheduled = unscheduledRes.data ?? []
+    setMembers(membersRes.data ?? [])
+    setStories(storiesRes.data ?? [])
+    setEvents(eventsRes.data ?? [])
+    setScheduledTasks(loadedScheduled)
+    setUnscheduledTasks(loadedUnscheduled)
+
+    const allTaskIds = [...loadedScheduled, ...loadedUnscheduled].map((t) => t.id)
+    if (allTaskIds.length > 0) {
+      const { data } = await supabase.from('task_assignees').select('*').in('task_id', allTaskIds)
+      setAssignees(data ?? [])
     } else {
-      setInviteCode(data)
+      setAssignees([])
     }
-    setGenerating(false)
+    setLoading(false)
   }
 
-  async function handleAddMember(e: FormEvent) {
+  async function handleAddEvent(e: FormEvent) {
     e.preventDefault()
-    if (!newMemberName.trim() || !profile) return
+    if (!eventTitle.trim() || !profile) return
 
-    setAddingMember(true)
-    setMemberError(null)
-    const { error } = await supabase.from('profiles').insert({
+    setAddingEvent(true)
+    setEventError(null)
+
+    const [startH, startM] = eventStart.split(':').map(Number)
+    const [endH, endM] = eventEnd.split(':').map(Number)
+    const start = new Date()
+    start.setHours(startH, startM, 0, 0)
+    const end = new Date()
+    end.setHours(endH, endM, 0, 0)
+
+    const { error } = await supabase.from('events').insert({
       family_id: profile.family_id,
-      display_name: newMemberName.trim(),
-      role: newMemberRole,
+      title: eventTitle.trim(),
+      start: start.toISOString(),
+      end: end.toISOString(),
+      owner_id: profile.id,
     })
     if (error) {
-      setMemberError(error.message)
+      setEventError(error.message)
     } else {
-      setNewMemberName('')
-      setNewMemberRole('child')
-      await loadMembers()
+      setEventTitle('')
+      await load()
     }
-    setAddingMember(false)
+    setAddingEvent(false)
+  }
+
+  async function handleAddTask(e: FormEvent) {
+    e.preventDefault()
+    if (!newTask.trim() || !profile) return
+
+    setAddingTask(true)
+    const { error } = await supabase.from('tasks').insert({
+      family_id: profile.family_id,
+      title: newTask.trim(),
+      due_date: dateString(new Date()),
+      story_id: newTaskStoryId || null,
+    })
+    if (!error) {
+      setNewTask('')
+      setNewTaskStoryId('')
+      await load()
+    }
+    setAddingTask(false)
+  }
+
+  async function toggleTask(task: Task) {
+    const isDone = task.status !== 'done'
+    const completed_at = isDone ? new Date().toISOString() : null
+    const status = isDone ? 'done' : 'todo'
+
+    await supabase.from('tasks').update({ status, completed_at }).eq('id', task.id)
+    setUnscheduledTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, status, completed_at } : t)))
+    setScheduledTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, status, completed_at } : t)))
+  }
+
+  const memberIds = members.map((m) => m.id)
+
+  const timeline: TimelineItem[] = [
+    ...events.map((e) => ({
+      kind: 'event' as const,
+      id: e.id,
+      title: e.title,
+      start: e.start,
+      ownerId: e.owner_id,
+    })),
+    ...scheduledTasks.map((t) => ({
+      kind: 'task' as const,
+      id: t.id,
+      title: t.title,
+      start: t.scheduled_start as string,
+      assigneeIds: assignees.filter((a) => a.task_id === t.id).map((a) => a.profile_id),
+      done: t.status === 'done',
+      storyId: t.story_id,
+    })),
+  ].sort((a, b) => a.start.localeCompare(b.start))
+
+  if (loading) {
+    return <div className="px-4 py-8 text-sm text-cream/60">Loading...</div>
   }
 
   return (
     <div className="px-4 py-8">
       <div className="mx-auto max-w-sm space-y-4">
-        <h1 className="text-2xl font-semibold">Hi, {profile?.display_name}</h1>
-        <p className="text-sm text-gray-600">
-          The Today timeline (events + scheduled tasks) is coming soon.
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-semibold">Hi, {profile?.display_name}</h1>
+          <Link to="/settings" className="text-sm text-cream/60 hover:text-cream">
+            Settings
+          </Link>
+        </div>
+        <p className="text-sm text-cream/60">
+          {new Date().toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })}
         </p>
 
-        <div className="rounded-lg bg-white p-4 shadow">
-          <h2 className="mb-2 font-medium">Household members</h2>
-          <ul className="space-y-1 text-sm">
-            {members.map((member) => (
-              <li key={member.id} className="flex justify-between">
-                <span>{member.display_name}</span>
-                <span className="text-gray-400">{member.role}</span>
+        <div className="rounded-lg bg-cream p-4 text-ink shadow">
+          <h2 className="mb-2 font-medium">Today's schedule</h2>
+          {timeline.length === 0 && <p className="text-sm text-stone">Nothing scheduled today.</p>}
+          <ul className="space-y-2">
+            {timeline.map((item) => {
+              const color =
+                item.kind === 'event'
+                  ? colorForProfile(item.ownerId, memberIds)
+                  : colorForProfile(null, memberIds)
+              return (
+                <li key={`${item.kind}-${item.id}`} className="flex items-start gap-3">
+                  <span className="w-12 shrink-0 text-xs text-stone">{formatTime(item.start)}</span>
+                  {item.kind === 'event' ? (
+                    <span className={`flex-1 rounded px-2 py-1 text-sm ${color.bg} ${color.text}`}>
+                      {item.title}
+                    </span>
+                  ) : (
+                    <span className={`flex-1 text-sm ${item.done ? 'text-stone line-through' : ''}`}>
+                      {item.storyId ? (
+                        <Link to={`/stories/${item.storyId}`} className="hover:underline">
+                          {item.title}
+                        </Link>
+                      ) : (
+                        item.title
+                      )}
+                      <span className="ml-2 inline-flex gap-1">
+                        {item.assigneeIds.map((id) => (
+                          <span
+                            key={id}
+                            className={`inline-block h-2 w-2 rounded-full ${colorForProfile(id, memberIds).dot}`}
+                          />
+                        ))}
+                      </span>
+                    </span>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+
+          <form onSubmit={handleAddEvent} className="mt-3 space-y-2 border-t pt-3">
+            <input
+              type="text"
+              placeholder="Event title"
+              value={eventTitle}
+              onChange={(e) => setEventTitle(e.target.value)}
+              className="w-full rounded border border-stone/30 px-3 py-1.5 text-sm focus:border-forest focus:outline-none"
+            />
+            <div className="flex gap-2">
+              <input
+                type="time"
+                value={eventStart}
+                onChange={(e) => setEventStart(e.target.value)}
+                className="flex-1 rounded border border-stone/30 px-2 py-1.5 text-sm focus:border-forest focus:outline-none"
+              />
+              <input
+                type="time"
+                value={eventEnd}
+                onChange={(e) => setEventEnd(e.target.value)}
+                className="flex-1 rounded border border-stone/30 px-2 py-1.5 text-sm focus:border-forest focus:outline-none"
+              />
+              <button
+                type="submit"
+                disabled={addingEvent || !eventTitle.trim()}
+                className="rounded bg-forest px-3 py-1.5 text-sm font-medium text-white hover:bg-ink disabled:opacity-50"
+              >
+                Add
+              </button>
+            </div>
+            {eventError && <p className="text-sm text-red-600">{eventError}</p>}
+          </form>
+        </div>
+
+        <div className="rounded-lg bg-cream p-4 text-ink shadow">
+          <h2 className="mb-2 font-medium">To do today</h2>
+          {unscheduledTasks.length === 0 && <p className="text-sm text-stone">Nothing on the list.</p>}
+          <ul className="space-y-2">
+            {unscheduledTasks.map((task) => (
+              <li key={task.id} className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={task.status === 'done'}
+                  onChange={() => toggleTask(task)}
+                  className="h-4 w-4 shrink-0 accent-forest"
+                />
+                <span className={`flex-1 text-sm ${task.status === 'done' ? 'text-stone line-through' : ''}`}>
+                  {task.story_id ? (
+                    <Link to={`/stories/${task.story_id}`} className="hover:underline">
+                      {task.title}
+                    </Link>
+                  ) : (
+                    task.title
+                  )}
+                </span>
+                <span className="inline-flex gap-1">
+                  {assignees
+                    .filter((a) => a.task_id === task.id)
+                    .map((a) => (
+                      <span
+                        key={a.profile_id}
+                        className={`inline-block h-2 w-2 rounded-full ${colorForProfile(a.profile_id, memberIds).dot}`}
+                      />
+                    ))}
+                </span>
               </li>
             ))}
           </ul>
 
-          <form onSubmit={handleAddMember} className="mt-3 flex gap-2">
+          <form onSubmit={handleAddTask} className="mt-3 space-y-2">
             <input
               type="text"
-              placeholder="Name"
-              value={newMemberName}
-              onChange={(e) => setNewMemberName(e.target.value)}
-              className="flex-1 rounded border border-gray-300 px-3 py-1.5 text-sm focus:border-indigo-500 focus:outline-none"
+              placeholder="Add something for today..."
+              value={newTask}
+              onChange={(e) => setNewTask(e.target.value)}
+              className="w-full rounded border border-stone/30 px-3 py-1.5 text-sm focus:border-forest focus:outline-none"
             />
-            <select
-              value={newMemberRole}
-              onChange={(e) => setNewMemberRole(e.target.value as ProfileRole)}
-              className="rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-indigo-500 focus:outline-none"
-            >
-              <option value="child">Child</option>
-              <option value="adult">Adult</option>
-            </select>
-            <button
-              type="submit"
-              disabled={addingMember || !newMemberName.trim()}
-              className="rounded bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
-            >
-              Add
-            </button>
+            <div className="flex gap-2">
+              {stories.length > 0 && (
+                <select
+                  value={newTaskStoryId}
+                  onChange={(e) => setNewTaskStoryId(e.target.value)}
+                  className="flex-1 rounded border border-stone/30 px-2 py-1.5 text-sm focus:border-forest focus:outline-none"
+                >
+                  <option value="">No story</option>
+                  {stories.map((story) => (
+                    <option key={story.id} value={story.id}>
+                      {story.title}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <button
+                type="submit"
+                disabled={addingTask || !newTask.trim()}
+                className="rounded bg-forest px-3 py-1.5 text-sm font-medium text-white hover:bg-ink disabled:opacity-50"
+              >
+                Add
+              </button>
+            </div>
           </form>
-          {memberError && <p className="mt-2 text-sm text-red-600">{memberError}</p>}
-          <p className="mt-2 text-xs text-gray-400">
-            Use this for family members without their own login (kids, etc). For adults who'll
-            log in themselves, send them an invite code instead.
-          </p>
         </div>
-
-        <div className="rounded-lg bg-white p-4 shadow">
-          <h2 className="mb-2 font-medium">Invite someone to your household</h2>
-          <button
-            onClick={handleGenerateInvite}
-            disabled={generating}
-            className="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
-          >
-            {generating ? 'Generating...' : 'Generate invite code'}
-          </button>
-          {inviteCode && (
-            <p className="mt-2 font-mono text-sm">
-              Code: <span className="font-semibold">{inviteCode}</span>{' '}
-              <span className="text-gray-500">(valid 7 days, single use)</span>
-            </p>
-          )}
-          {inviteError && <p className="mt-2 text-sm text-red-600">{inviteError}</p>}
-        </div>
-
-        <button
-          onClick={() => supabase.auth.signOut()}
-          className="text-sm text-gray-500 hover:underline"
-        >
-          Log out
-        </button>
       </div>
     </div>
   )

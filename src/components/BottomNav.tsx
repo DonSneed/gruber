@@ -1,14 +1,14 @@
 import { NavLink } from 'react-router-dom'
 
 const tabs = [
-  { to: '/', label: 'Today', icon: '📅' },
+  { to: '/', label: 'Today', icon: '🎯' },
   { to: '/stories', label: 'Stories', icon: '📖' },
   { to: '/calendar', label: 'Calendar', icon: '🗓️' },
 ]
 
 export function BottomNav() {
   return (
-    <nav className="fixed inset-x-0 bottom-0 flex border-t bg-white">
+    <nav className="fixed inset-x-0 bottom-0 flex border-t border-cream/10 bg-forest">
       {tabs.map((tab) => (
         <NavLink
           key={tab.to}
@@ -16,7 +16,7 @@ export function BottomNav() {
           end={tab.to === '/'}
           className={({ isActive }) =>
             `flex flex-1 flex-col items-center gap-0.5 py-2 text-xs ${
-              isActive ? 'text-indigo-600' : 'text-gray-500'
+              isActive ? 'text-cream' : 'text-cream/40'
             }`
           }
         >

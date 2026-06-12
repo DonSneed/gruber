@@ -1,1 +1,13 @@
 @import "tailwindcss";
+
+@theme {
+  --color-cream: #f7f8e5;
+  --color-ink: #020202;
+  --color-forest: #232d23;
+  --color-stone: #6d6a61;
+}
+
+body {
+  background-color: var(--color-forest);
+  color: var(--color-cream);
+}

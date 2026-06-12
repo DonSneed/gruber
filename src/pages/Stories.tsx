@@ -67,19 +67,19 @@ export function Stories() {
             placeholder="New story title..."
             value={newTitle}
             onChange={(e) => setNewTitle(e.target.value)}
-            className="flex-1 rounded border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:outline-none"
+            className="flex-1 rounded border border-stone/30 bg-cream px-3 py-2 text-ink focus:border-forest focus:outline-none"
           />
           <button
             type="submit"
             disabled={creating || !newTitle.trim()}
-            className="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+            className="rounded bg-cream px-4 py-2 text-sm font-medium text-ink hover:bg-stone/20 disabled:opacity-50"
           >
             Add
           </button>
         </form>
 
         {loading ? (
-          <p className="text-sm text-gray-500">Loading...</p>
+          <p className="text-sm text-cream/60">Loading...</p>
         ) : (
           <div className="space-y-6 md:grid md:grid-cols-2 md:gap-4 md:space-y-0">
             <StoryColumn title="Active" stories={active} progressFor={progressFor} />
@@ -102,8 +102,8 @@ function StoryColumn({
 }) {
   return (
     <div className="space-y-3">
-      <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">{title}</h2>
-      {stories.length === 0 && <p className="text-sm text-gray-400">No stories yet.</p>}
+      <h2 className="text-sm font-semibold uppercase tracking-wide text-stone">{title}</h2>
+      {stories.length === 0 && <p className="text-sm text-stone">No stories yet.</p>}
       {stories.map((story) => {
         const { total, done } = progressFor(story.id)
         const pct = total > 0 ? Math.round((done / total) * 100) : 0
@@ -111,18 +111,18 @@ function StoryColumn({
           <Link
             key={story.id}
             to={`/stories/${story.id}`}
-            className="block rounded-lg bg-white p-4 shadow hover:shadow-md"
+            className="block rounded-lg bg-cream p-4 text-ink shadow hover:shadow-md"
           >
             <h3 className="font-medium">{story.title}</h3>
             {total > 0 && (
               <>
-                <div className="mt-2 h-2 w-full rounded-full bg-gray-200">
+                <div className="mt-2 h-2 w-full rounded-full bg-stone/20">
                   <div
-                    className="h-2 rounded-full bg-indigo-600"
+                    className="h-2 rounded-full bg-forest"
                     style={{ width: `${pct}%` }}
                   />
                 </div>
-                <p className="mt-1 text-xs text-gray-500">
+                <p className="mt-1 text-xs text-stone">
                   {done} of {total} tasks
                 </p>
               </>

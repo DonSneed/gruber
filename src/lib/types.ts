@@ -40,3 +40,16 @@ export interface TaskAssignee {
   task_id: string
   profile_id: string
 }
+
+export type EventVisibility = 'family' | 'private'
+
+export interface Event {
+  id: string
+  family_id: string
+  title: string
+  start: string
+  end: string
+  owner_id: string | null
+  visibility: EventVisibility
+  created_at: string
+}

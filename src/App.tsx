@@ -9,13 +9,14 @@ import { Today } from './pages/Today'
 import { Stories } from './pages/Stories'
 import { StoryDetail } from './pages/StoryDetail'
 import { CalendarPage } from './pages/CalendarPage'
+import { Settings } from './pages/Settings'
 
 function AppRoutes() {
   const { loading } = useAuth()
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50 text-gray-500">
+      <div className="flex min-h-screen items-center justify-center bg-forest text-cream/60">
         Loading...
       </div>
     )
@@ -31,6 +32,7 @@ function AppRoutes() {
         <Route path="/stories" element={<Stories />} />
         <Route path="/stories/:id" element={<StoryDetail />} />
         <Route path="/calendar" element={<CalendarPage />} />
+        <Route path="/settings" element={<Settings />} />
       </Route>
     </Routes>
   )

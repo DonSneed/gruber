@@ -34,10 +34,10 @@ export function Signup() {
 
   if (checkEmail) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
-        <div className="w-full max-w-sm rounded-lg bg-white p-6 text-center shadow">
+      <div className="flex min-h-screen items-center justify-center bg-forest px-4">
+        <div className="w-full max-w-sm rounded-lg bg-cream p-6 text-center text-ink shadow">
           <h1 className="mb-2 text-xl font-semibold">Check your email</h1>
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-stone">
             We sent a confirmation link to <strong>{email}</strong>. Click it to activate your
             account, then come back and log in.
           </p>
@@ -47,43 +47,43 @@ export function Signup() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
+    <div className="flex min-h-screen items-center justify-center bg-forest px-4">
       <div className="w-full max-w-sm">
         <h1 className="mb-6 text-center text-2xl font-semibold">Everyday Manager</h1>
-        <form onSubmit={handleSubmit} className="space-y-4 rounded-lg bg-white p-6 shadow">
+        <form onSubmit={handleSubmit} className="space-y-4 rounded-lg bg-cream p-6 text-ink shadow">
           <div>
-            <label className="block text-sm font-medium text-gray-700">Email</label>
+            <label className="block text-sm font-medium text-ink">Email</label>
             <input
               type="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="mt-1 w-full rounded border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:outline-none"
+              className="mt-1 w-full rounded border border-stone/30 px-3 py-2 focus:border-forest focus:outline-none"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Password</label>
+            <label className="block text-sm font-medium text-ink">Password</label>
             <input
               type="password"
               required
               minLength={6}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="mt-1 w-full rounded border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:outline-none"
+              className="mt-1 w-full rounded border border-stone/30 px-3 py-2 focus:border-forest focus:outline-none"
             />
           </div>
           {error && <p className="text-sm text-red-600">{error}</p>}
           <button
             type="submit"
             disabled={submitting}
-            className="w-full rounded bg-indigo-600 py-2 font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+            className="w-full rounded bg-forest py-2 font-medium text-white hover:bg-ink disabled:opacity-50"
           >
             {submitting ? 'Signing up...' : 'Sign up'}
           </button>
         </form>
-        <p className="mt-4 text-center text-sm text-gray-600">
+        <p className="mt-4 text-center text-sm text-cream/60">
           Already have an account?{' '}
-          <Link to="/login" className="font-medium text-indigo-600 hover:underline">
+          <Link to="/login" className="font-medium text-cream hover:underline">
             Log in
           </Link>
         </p>
