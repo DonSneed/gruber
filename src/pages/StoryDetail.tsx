@@ -293,12 +293,16 @@ export function StoryDetail() {
                 </div>
 
                 <div className="ml-6 mt-1 flex items-center gap-1 text-xs text-stone">
-                  {task.scheduled_start && (
-                    <span className="mr-1">
-                      {formatDateTime(task.scheduled_start)}
-                      {task.scheduled_end ? ` – ${formatDateTime(task.scheduled_end)}` : ''}
-                    </span>
-                  )}
+                  <span className="mr-1">
+                    {task.scheduled_start ? (
+                      <>
+                        {formatDateTime(task.scheduled_start)}
+                        {task.scheduled_end ? ` – ${formatDateTime(task.scheduled_end)}` : ''}
+                      </>
+                    ) : (
+                      formatDateTime(task.created_at)
+                    )}
+                  </span>
                   <button
                     onClick={() =>
                       editingScheduleId === task.id ? cancelEditSchedule() : startEditSchedule(task)

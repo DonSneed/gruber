@@ -3,11 +3,11 @@ import type { ReactNode } from 'react'
 export function Collapse({ open, children }: { open: boolean; children: ReactNode }) {
   return (
     <div
-      className={`grid transition-all duration-200 ease-out ${
-        open ? 'mt-2 grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
+      className={`overflow-hidden transition-all duration-200 ease-out ${
+        open ? 'mt-2 max-h-96 opacity-100' : 'max-h-0 opacity-0'
       }`}
     >
-      <div className="overflow-hidden">{children}</div>
+      {children}
     </div>
   )
 }
