@@ -38,7 +38,8 @@ export function Today() {
   const [newTask, setNewTask] = useState('')
   const [newTaskStoryId, setNewTaskStoryId] = useState('')
   const [addingTask, setAddingTask] = useState(false)
-  const [showTaskTime, setShowTaskTime] = useState(false)
+  const [showSchedule, setShowSchedule] = useState(false)
+  const [newTaskDate, setNewTaskDate] = useState('')
   const [newTaskStart, setNewTaskStart] = useState('09:00')
   const [newTaskEnd, setNewTaskEnd] = useState('')
 
@@ -46,12 +47,51 @@ export function Today() {
     load()
   }, [])
 
+  async function materializeRecurringTasks(todayStr: string, dayOfWeek: number) {
+    if (!profile) return
+    const { data: recurring } = await supabase
+      .from('recurring_tasks')
+      .select('*')
+      .eq('active', true)
+      .contains('days_of_week', [dayOfWeek])
+    if (!recurring || recurring.length === 0) return
+
+    const { data: existing } = await supabase
+      .from('tasks')
+      .select('recurring_task_id')
+      .eq('due_date', todayStr)
+      .not('recurring_task_id', 'is', null)
+    const existingIds = new Set((existing ?? []).map((t) => t.recurring_task_id))
+
+    const missing = recurring.filter((rt) => !existingIds.has(rt.id))
+    if (missing.length === 0) return
+
+    const inserts = missing.map((rt) => ({
+      family_id: rt.family_id,
+      story_id: rt.story_id,
+      title: rt.title,
+      due_date: todayStr,
+      recurring_task_id: rt.id,
+      scheduled_start: rt.scheduled_start_time
+        ? new Date(`${todayStr}T${rt.scheduled_start_time}`).toISOString()
+        : null,
+      scheduled_end: rt.scheduled_end_time
+        ? new Date(`${todayStr}T${rt.scheduled_end_time}`).toISOString()
+        : null,
+    }))
+
+    await supabase.from('tasks').insert(inserts)
+  }
+
   async function load() {
     setLoading(true)
     const now = new Date()
     const todayStr = dateString(now)
     const dayStart = startOfDay(now).toISOString()
     const dayEnd = endOfDay(now).toISOString()
+
+    await materializeRecurringTasks(todayStr, now.getDay())
+
     const [membersRes, storiesRes, eventsRes, scheduledRes, unscheduledRes] = await Promise.all([
       supabase.from('profiles').select('*').order('created_at'),
       supabase.from('stories').select('*').eq('status', 'active').order('created_at'),
@@ -119,6 +159,7 @@ export function Today() {
 
     setAddingTask(true)
     const todayStr = dateString(new Date())
+    const scheduleDate = showSchedule && newTaskDate ? newTaskDate : todayStr
     const insert: {
       family_id: string
       title: string
@@ -129,13 +170,13 @@ export function Today() {
     } = {
       family_id: profile.family_id,
       title: newTask.trim(),
-      due_date: todayStr,
+      due_date: scheduleDate,
       story_id: newTaskStoryId || null,
     }
-    if (showTaskTime && newTaskStart) {
-      insert.scheduled_start = new Date(`${todayStr}T${newTaskStart}`).toISOString()
+    if (showSchedule && newTaskStart) {
+      insert.scheduled_start = new Date(`${scheduleDate}T${newTaskStart}`).toISOString()
       if (newTaskEnd) {
-        insert.scheduled_end = new Date(`${todayStr}T${newTaskEnd}`).toISOString()
+        insert.scheduled_end = new Date(`${scheduleDate}T${newTaskEnd}`).toISOString()
       }
     }
 
@@ -143,7 +184,8 @@ export function Today() {
     if (!error) {
       setNewTask('')
       setNewTaskStoryId('')
-      setShowTaskTime(false)
+      setShowSchedule(false)
+      setNewTaskDate('')
       setNewTaskEnd('')
       await load()
     }
@@ -359,8 +401,14 @@ export function Today() {
                 Add
               </button>
             </div>
-            {showTaskTime ? (
+            {showSchedule ? (
               <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  value={newTaskDate}
+                  onChange={(e) => setNewTaskDate(e.target.value)}
+                  className="rounded border border-stone/30 px-2 py-1 text-xs focus:border-forest focus:outline-none"
+                />
                 <input
                   type="time"
                   value={newTaskStart}
@@ -376,7 +424,7 @@ export function Today() {
                 />
                 <button
                   type="button"
-                  onClick={() => setShowTaskTime(false)}
+                  onClick={() => setShowSchedule(false)}
                   className="text-xs text-stone hover:text-ink"
                 >
                   Cancel
@@ -385,10 +433,13 @@ export function Today() {
             ) : (
               <button
                 type="button"
-                onClick={() => setShowTaskTime(true)}
+                onClick={() => {
+                  setShowSchedule(true)
+                  setNewTaskDate(dateString(new Date()))
+                }}
                 className="text-xs text-forest hover:underline"
               >
-                + Add time
+                + Schedule
               </button>
             )}
           </form>
