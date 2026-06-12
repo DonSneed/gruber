@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
+import { Clock, Image as ImageIcon, Repeat, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
+import { Collapse } from '../components/Collapse'
 import { dateString, formatDateTime, toTimeInput } from '../lib/date'
 import { PhotoStrip } from '../components/PhotoStrip'
 import { createRecurringTask, DAY_LABELS, materializeRecurringTasks } from '../lib/recurring'
@@ -290,41 +292,46 @@ export function StoryDetail() {
                   </button>
                 </div>
 
-                <div className="ml-6 mt-1 flex items-center gap-2 text-xs text-stone">
-                  {task.scheduled_start ? (
-                    <>
-                      <span>
-                        {formatDateTime(task.scheduled_start)}
-                        {task.scheduled_end ? ` – ${formatDateTime(task.scheduled_end)}` : ''}
-                      </span>
-                      <button onClick={() => startEditSchedule(task)} className="hover:text-forest">
-                        Edit
-                      </button>
-                      <button onClick={() => clearSchedule(task.id)} className="hover:text-red-600">
-                        Remove
-                      </button>
-                    </>
-                  ) : (
-                    <button onClick={() => startEditSchedule(task)} className="hover:text-forest">
-                      + Schedule
+                <div className="ml-6 mt-1 flex items-center gap-1 text-xs text-stone">
+                  {task.scheduled_start && (
+                    <span className="mr-1">
+                      {formatDateTime(task.scheduled_start)}
+                      {task.scheduled_end ? ` – ${formatDateTime(task.scheduled_end)}` : ''}
+                    </span>
+                  )}
+                  <button
+                    onClick={() =>
+                      editingScheduleId === task.id ? cancelEditSchedule() : startEditSchedule(task)
+                    }
+                    title="Schedule"
+                    className={`rounded p-1 ${
+                      editingScheduleId === task.id ? 'bg-forest text-white' : 'hover:bg-stone/10 hover:text-forest'
+                    }`}
+                  >
+                    <Clock className="h-3.5 w-3.5" />
+                  </button>
+                  {task.scheduled_start && (
+                    <button
+                      onClick={() => clearSchedule(task.id)}
+                      title="Remove schedule"
+                      className="rounded p-1 hover:bg-stone/10 hover:text-red-600"
+                    >
+                      <X className="h-3.5 w-3.5" />
                     </button>
                   )}
                   <button
                     onClick={() => setPhotosTaskId(photosTaskId === task.id ? null : task.id)}
-                    className="hover:text-forest"
+                    title="Photos"
+                    className={`rounded p-1 ${
+                      photosTaskId === task.id ? 'bg-forest text-white' : 'hover:bg-stone/10 hover:text-forest'
+                    }`}
                   >
-                    {photosTaskId === task.id ? 'Hide photos' : '+ Photos'}
+                    <ImageIcon className="h-3.5 w-3.5" />
                   </button>
                 </div>
 
-                {photosTaskId === task.id && profile && (
-                  <div className="ml-6 mt-1">
-                    <PhotoStrip familyId={profile.family_id} profileId={profile.id} taskId={task.id} />
-                  </div>
-                )}
-
-                {editingScheduleId === task.id && (
-                  <div className="ml-6 mt-1 flex items-center gap-2">
+                <Collapse open={editingScheduleId === task.id}>
+                  <div className="ml-6 flex items-center gap-2">
                     <input
                       type="date"
                       value={scheduleDate}
@@ -353,7 +360,15 @@ export function StoryDetail() {
                       Cancel
                     </button>
                   </div>
-                )}
+                </Collapse>
+
+                <Collapse open={photosTaskId === task.id}>
+                  {profile && (
+                    <div className="ml-6">
+                      <PhotoStrip familyId={profile.family_id} profileId={profile.id} taskId={task.id} />
+                    </div>
+                  )}
+                </Collapse>
               </li>
             ))}
           </ul>
@@ -375,7 +390,30 @@ export function StoryDetail() {
                 Add
               </button>
             </div>
-            {showNewSchedule ? (
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => {
+                  if (!showNewSchedule) setNewTaskDate(dateString(new Date()))
+                  setShowNewSchedule((prev) => !prev)
+                }}
+                title="Schedule"
+                className={`rounded p-1.5 ${
+                  showNewSchedule ? 'bg-forest text-white' : 'text-stone hover:bg-stone/10'
+                }`}
+              >
+                <Clock className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowRepeat((prev) => !prev)}
+                title="Repeat"
+                className={`rounded p-1.5 ${showRepeat ? 'bg-forest text-white' : 'text-stone hover:bg-stone/10'}`}
+              >
+                <Repeat className="h-4 w-4" />
+              </button>
+            </div>
+            <Collapse open={showNewSchedule}>
               <div className="flex items-center gap-2">
                 <input
                   type="date"
@@ -395,27 +433,9 @@ export function StoryDetail() {
                   onChange={(e) => setNewTaskEnd(e.target.value)}
                   className="rounded border border-stone/30 px-2 py-1 text-xs focus:border-forest focus:outline-none"
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowNewSchedule(false)}
-                  className="text-xs text-stone hover:text-ink"
-                >
-                  Cancel
-                </button>
               </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => {
-                  setShowNewSchedule(true)
-                  setNewTaskDate(dateString(new Date()))
-                }}
-                className="text-xs text-forest hover:underline"
-              >
-                + Add schedule
-              </button>
-            )}
-            {showRepeat ? (
+            </Collapse>
+            <Collapse open={showRepeat}>
               <div className="flex items-center gap-1">
                 {DAY_LABELS.map((label, day) => (
                   <button
@@ -429,22 +449,8 @@ export function StoryDetail() {
                     {label}
                   </button>
                 ))}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowRepeat(false)
-                    setRepeatDays([])
-                  }}
-                  className="ml-1 text-xs text-stone hover:text-ink"
-                >
-                  Cancel
-                </button>
               </div>
-            ) : (
-              <button type="button" onClick={() => setShowRepeat(true)} className="text-xs text-forest hover:underline">
-                + Repeat
-              </button>
-            )}
+            </Collapse>
           </form>
         </div>
 

@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link } from 'react-router-dom'
+import { Clock, Repeat } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
+import { Collapse } from '../components/Collapse'
 import { colorForProfile } from '../lib/colors'
 import { dateString, endOfDay, formatTime, startOfDay } from '../lib/date'
 import { createRecurringTask, DAY_LABELS, materializeRecurringTasks } from '../lib/recurring'
@@ -399,7 +401,30 @@ export function Today() {
                 Add
               </button>
             </div>
-            {showSchedule ? (
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => {
+                  if (!showSchedule) setNewTaskDate(dateString(new Date()))
+                  setShowSchedule((prev) => !prev)
+                }}
+                title="Schedule"
+                className={`rounded p-1.5 ${
+                  showSchedule ? 'bg-forest text-white' : 'text-stone hover:bg-stone/10'
+                }`}
+              >
+                <Clock className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowRepeat((prev) => !prev)}
+                title="Repeat"
+                className={`rounded p-1.5 ${showRepeat ? 'bg-forest text-white' : 'text-stone hover:bg-stone/10'}`}
+              >
+                <Repeat className="h-4 w-4" />
+              </button>
+            </div>
+            <Collapse open={showSchedule}>
               <div className="flex items-center gap-2">
                 <input
                   type="date"
@@ -420,27 +445,9 @@ export function Today() {
                   onChange={(e) => setNewTaskEnd(e.target.value)}
                   className="rounded border border-stone/30 px-2 py-1 text-xs focus:border-forest focus:outline-none"
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowSchedule(false)}
-                  className="text-xs text-stone hover:text-ink"
-                >
-                  Cancel
-                </button>
               </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => {
-                  setShowSchedule(true)
-                  setNewTaskDate(dateString(new Date()))
-                }}
-                className="text-xs text-forest hover:underline"
-              >
-                + Schedule
-              </button>
-            )}
-            {showRepeat ? (
+            </Collapse>
+            <Collapse open={showRepeat}>
               <div className="flex items-center gap-1">
                 {DAY_LABELS.map((label, day) => (
                   <button
@@ -454,22 +461,8 @@ export function Today() {
                     {label}
                   </button>
                 ))}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowRepeat(false)
-                    setRepeatDays([])
-                  }}
-                  className="ml-1 text-xs text-stone hover:text-ink"
-                >
-                  Cancel
-                </button>
               </div>
-            ) : (
-              <button type="button" onClick={() => setShowRepeat(true)} className="text-xs text-forest hover:underline">
-                + Repeat
-              </button>
-            )}
+            </Collapse>
           </form>
         </div>
       </div>
