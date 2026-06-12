@@ -53,6 +53,12 @@ export function Stories() {
     return { total: storyTasks.length, done }
   }
 
+  async function deleteStory(storyId: string) {
+    if (!confirm('Delete this story and all its tasks?')) return
+    await supabase.from('stories').delete().eq('id', storyId)
+    setStories((prev) => prev.filter((s) => s.id !== storyId))
+  }
+
   const active = stories.filter((s) => s.status === 'active')
   const done = stories.filter((s) => s.status === 'done')
 
@@ -82,8 +88,8 @@ export function Stories() {
           <p className="text-sm text-cream/60">Loading...</p>
         ) : (
           <div className="space-y-6 md:grid md:grid-cols-2 md:gap-4 md:space-y-0">
-            <StoryColumn title="Active" stories={active} progressFor={progressFor} />
-            <StoryColumn title="Done" stories={done} progressFor={progressFor} />
+            <StoryColumn title="Active" stories={active} progressFor={progressFor} onDelete={deleteStory} />
+            <StoryColumn title="Done" stories={done} progressFor={progressFor} onDelete={deleteStory} />
           </div>
         )}
       </div>
@@ -95,10 +101,12 @@ function StoryColumn({
   title,
   stories,
   progressFor,
+  onDelete,
 }: {
   title: string
   stories: Story[]
   progressFor: (storyId: string) => { total: number; done: number }
+  onDelete: (storyId: string) => void
 }) {
   return (
     <div className="space-y-3">
@@ -111,9 +119,20 @@ function StoryColumn({
           <Link
             key={story.id}
             to={`/stories/${story.id}`}
-            className="block rounded-lg bg-cream p-4 text-ink shadow hover:shadow-md"
+            className="relative block rounded-lg bg-cream p-4 text-ink shadow hover:shadow-md"
           >
-            <h3 className="font-medium">{story.title}</h3>
+            <button
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                onDelete(story.id)
+              }}
+              className="absolute right-3 top-3 text-xs text-stone hover:text-red-600"
+              title="Delete story"
+            >
+              &times;
+            </button>
+            <h3 className="pr-4 font-medium">{story.title}</h3>
             {total > 0 && (
               <>
                 <div className="mt-2 h-2 w-full rounded-full bg-stone/20">

@@ -17,6 +17,10 @@ export function Settings() {
   const [addingMember, setAddingMember] = useState(false)
   const [memberError, setMemberError] = useState<string | null>(null)
 
+  const [profileInviteCodes, setProfileInviteCodes] = useState<Record<string, string>>({})
+  const [profileInviteErrors, setProfileInviteErrors] = useState<Record<string, string>>({})
+  const [generatingProfileInvite, setGeneratingProfileInvite] = useState<string | null>(null)
+
   useEffect(() => {
     loadMembers()
   }, [])
@@ -36,6 +40,18 @@ export function Settings() {
       setInviteCode(data)
     }
     setGenerating(false)
+  }
+
+  async function handleGenerateProfileInvite(profileId: string) {
+    setProfileInviteErrors((prev) => ({ ...prev, [profileId]: '' }))
+    setGeneratingProfileInvite(profileId)
+    const { data, error } = await supabase.rpc('create_profile_invite', { target_profile_id: profileId })
+    if (error) {
+      setProfileInviteErrors((prev) => ({ ...prev, [profileId]: error.message }))
+    } else {
+      setProfileInviteCodes((prev) => ({ ...prev, [profileId]: data }))
+    }
+    setGeneratingProfileInvite(null)
   }
 
   async function handleAddMember(e: FormEvent) {
@@ -70,11 +86,35 @@ export function Settings() {
 
         <div className="rounded-lg bg-cream p-4 text-ink shadow">
           <h2 className="mb-2 font-medium">Household members</h2>
-          <ul className="space-y-1 text-sm">
+          <ul className="space-y-2 text-sm">
             {members.map((member) => (
-              <li key={member.id} className="flex justify-between">
-                <span>{member.display_name}</span>
-                <span className="text-stone">{member.role}</span>
+              <li key={member.id}>
+                <div className="flex items-center justify-between">
+                  <span>{member.display_name}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-stone">{member.role}</span>
+                    {!member.auth_user_id && (
+                      <button
+                        onClick={() => handleGenerateProfileInvite(member.id)}
+                        disabled={generatingProfileInvite === member.id}
+                        className="rounded border border-stone/30 px-2 py-0.5 text-xs text-stone hover:bg-stone/10 disabled:opacity-50"
+                      >
+                        {generatingProfileInvite === member.id ? 'Generating...' : 'Get login code'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+                {profileInviteCodes[member.id] && (
+                  <p className="mt-1 font-mono text-xs">
+                    Code: <span className="font-semibold">{profileInviteCodes[member.id]}</span>{' '}
+                    <span className="text-stone">
+                      (valid 7 days &mdash; signs in as {member.display_name})
+                    </span>
+                  </p>
+                )}
+                {profileInviteErrors[member.id] && (
+                  <p className="mt-1 text-xs text-red-600">{profileInviteErrors[member.id]}</p>
+                )}
               </li>
             ))}
           </ul>

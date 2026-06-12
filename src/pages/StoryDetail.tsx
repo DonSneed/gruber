@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Link, Navigate, useParams } from 'react-router-dom'
+import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { dateString, formatDateTime, toTimeInput } from '../lib/date'
@@ -8,6 +8,7 @@ import type { Profile, Story, Task, TaskAssignee } from '../lib/types'
 
 export function StoryDetail() {
   const { id } = useParams<{ id: string }>()
+  const navigate = useNavigate()
   const { profile } = useAuth()
   const [story, setStory] = useState<Story | null>(null)
   const [tasks, setTasks] = useState<Task[]>([])
@@ -162,6 +163,13 @@ export function StoryDetail() {
     setStory({ ...story, status })
   }
 
+  async function deleteStory() {
+    if (!story) return
+    if (!confirm('Delete this story and all its tasks?')) return
+    await supabase.from('stories').delete().eq('id', story.id)
+    navigate('/stories')
+  }
+
   if (loading) {
     return <div className="px-4 py-8 text-sm text-cream/60">Loading...</div>
   }
@@ -178,12 +186,20 @@ export function StoryDetail() {
 
         <div className="flex items-start justify-between gap-2">
           <h1 className="text-2xl font-semibold">{story.title}</h1>
-          <button
-            onClick={toggleStoryStatus}
-            className="shrink-0 rounded border border-cream/30 px-3 py-1 text-xs font-medium text-cream/80 hover:bg-cream/10"
-          >
-            {story.status === 'active' ? 'Mark done' : 'Mark active'}
-          </button>
+          <div className="flex shrink-0 gap-2">
+            <button
+              onClick={toggleStoryStatus}
+              className="rounded border border-cream/30 px-3 py-1 text-xs font-medium text-cream/80 hover:bg-cream/10"
+            >
+              {story.status === 'active' ? 'Mark done' : 'Mark active'}
+            </button>
+            <button
+              onClick={deleteStory}
+              className="rounded border border-cream/30 px-3 py-1 text-xs font-medium text-cream/80 hover:bg-red-600 hover:text-white hover:border-red-600"
+            >
+              Delete
+            </button>
+          </div>
         </div>
 
         {story.description && <p className="text-sm text-cream/60">{story.description}</p>}

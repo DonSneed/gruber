@@ -38,6 +38,9 @@ export function Today() {
   const [newTask, setNewTask] = useState('')
   const [newTaskStoryId, setNewTaskStoryId] = useState('')
   const [addingTask, setAddingTask] = useState(false)
+  const [showTaskTime, setShowTaskTime] = useState(false)
+  const [newTaskStart, setNewTaskStart] = useState('09:00')
+  const [newTaskEnd, setNewTaskEnd] = useState('')
 
   useEffect(() => {
     load()
@@ -115,15 +118,33 @@ export function Today() {
     if (!newTask.trim() || !profile) return
 
     setAddingTask(true)
-    const { error } = await supabase.from('tasks').insert({
+    const todayStr = dateString(new Date())
+    const insert: {
+      family_id: string
+      title: string
+      due_date: string
+      story_id: string | null
+      scheduled_start?: string
+      scheduled_end?: string
+    } = {
       family_id: profile.family_id,
       title: newTask.trim(),
-      due_date: dateString(new Date()),
+      due_date: todayStr,
       story_id: newTaskStoryId || null,
-    })
+    }
+    if (showTaskTime && newTaskStart) {
+      insert.scheduled_start = new Date(`${todayStr}T${newTaskStart}`).toISOString()
+      if (newTaskEnd) {
+        insert.scheduled_end = new Date(`${todayStr}T${newTaskEnd}`).toISOString()
+      }
+    }
+
+    const { error } = await supabase.from('tasks').insert(insert)
     if (!error) {
       setNewTask('')
       setNewTaskStoryId('')
+      setShowTaskTime(false)
+      setNewTaskEnd('')
       await load()
     }
     setAddingTask(false)
@@ -137,6 +158,12 @@ export function Today() {
     await supabase.from('tasks').update({ status, completed_at }).eq('id', task.id)
     setUnscheduledTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, status, completed_at } : t)))
     setScheduledTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, status, completed_at } : t)))
+  }
+
+  async function deleteTask(taskId: string) {
+    await supabase.from('tasks').delete().eq('id', taskId)
+    setUnscheduledTasks((prev) => prev.filter((t) => t.id !== taskId))
+    setScheduledTasks((prev) => prev.filter((t) => t.id !== taskId))
   }
 
   const memberIds = members.map((m) => m.id)
@@ -212,6 +239,15 @@ export function Today() {
                       </span>
                     </span>
                   )}
+                  {item.kind === 'task' && (
+                    <button
+                      onClick={() => deleteTask(item.id)}
+                      className="shrink-0 text-xs text-stone hover:text-red-600"
+                      title="Delete task"
+                    >
+                      &times;
+                    </button>
+                  )}
                 </li>
               )
             })}
@@ -281,6 +317,13 @@ export function Today() {
                       />
                     ))}
                 </span>
+                <button
+                  onClick={() => deleteTask(task.id)}
+                  className="shrink-0 text-xs text-stone hover:text-red-600"
+                  title="Delete task"
+                >
+                  &times;
+                </button>
               </li>
             ))}
           </ul>
@@ -316,6 +359,38 @@ export function Today() {
                 Add
               </button>
             </div>
+            {showTaskTime ? (
+              <div className="flex items-center gap-2">
+                <input
+                  type="time"
+                  value={newTaskStart}
+                  onChange={(e) => setNewTaskStart(e.target.value)}
+                  className="rounded border border-stone/30 px-2 py-1 text-xs focus:border-forest focus:outline-none"
+                />
+                <span className="text-xs text-stone">to</span>
+                <input
+                  type="time"
+                  value={newTaskEnd}
+                  onChange={(e) => setNewTaskEnd(e.target.value)}
+                  className="rounded border border-stone/30 px-2 py-1 text-xs focus:border-forest focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowTaskTime(false)}
+                  className="text-xs text-stone hover:text-ink"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowTaskTime(true)}
+                className="text-xs text-forest hover:underline"
+              >
+                + Add time
+              </button>
+            )}
           </form>
         </div>
       </div>
