@@ -4,6 +4,7 @@ import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { dateString, formatDateTime, toTimeInput } from '../lib/date'
+import { PhotoStrip } from '../components/PhotoStrip'
 import type { Profile, Story, Task, TaskAssignee } from '../lib/types'
 
 export function StoryDetail() {
@@ -27,6 +28,8 @@ export function StoryDetail() {
   const [scheduleDate, setScheduleDate] = useState('')
   const [scheduleStart, setScheduleStart] = useState('')
   const [scheduleEnd, setScheduleEnd] = useState('')
+
+  const [photosTaskId, setPhotosTaskId] = useState<string | null>(null)
 
   useEffect(() => {
     if (id) load(id)
@@ -273,7 +276,19 @@ export function StoryDetail() {
                       + Schedule
                     </button>
                   )}
+                  <button
+                    onClick={() => setPhotosTaskId(photosTaskId === task.id ? null : task.id)}
+                    className="hover:text-forest"
+                  >
+                    {photosTaskId === task.id ? 'Hide photos' : '+ Photos'}
+                  </button>
                 </div>
+
+                {photosTaskId === task.id && profile && (
+                  <div className="ml-6 mt-1">
+                    <PhotoStrip familyId={profile.family_id} profileId={profile.id} taskId={task.id} />
+                  </div>
+                )}
 
                 {editingScheduleId === task.id && (
                   <div className="ml-6 mt-1 flex items-center gap-2">
@@ -372,7 +387,7 @@ export function StoryDetail() {
 
         <div className="rounded-lg bg-cream p-4 text-ink shadow">
           <h2 className="mb-2 font-medium">Memories</h2>
-          <p className="text-sm text-stone">Photo memories coming soon.</p>
+          {profile && <PhotoStrip familyId={profile.family_id} profileId={profile.id} storyId={story.id} />}
         </div>
       </div>
     </div>
