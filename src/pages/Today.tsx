@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { colorForProfile } from '../lib/colors'
 import { dateString, endOfDay, formatTime, startOfDay } from '../lib/date'
+import { createRecurringTask, DAY_LABELS, materializeRecurringTasks } from '../lib/recurring'
 import type { Event, Profile, Story, Task, TaskAssignee } from '../lib/types'
 
 type TimelineItem =
@@ -42,46 +43,12 @@ export function Today() {
   const [newTaskDate, setNewTaskDate] = useState('')
   const [newTaskStart, setNewTaskStart] = useState('09:00')
   const [newTaskEnd, setNewTaskEnd] = useState('')
+  const [showRepeat, setShowRepeat] = useState(false)
+  const [repeatDays, setRepeatDays] = useState<number[]>([])
 
   useEffect(() => {
     load()
   }, [])
-
-  async function materializeRecurringTasks(todayStr: string, dayOfWeek: number) {
-    if (!profile) return
-    const { data: recurring } = await supabase
-      .from('recurring_tasks')
-      .select('*')
-      .eq('active', true)
-      .contains('days_of_week', [dayOfWeek])
-    if (!recurring || recurring.length === 0) return
-
-    const { data: existing } = await supabase
-      .from('tasks')
-      .select('recurring_task_id')
-      .eq('due_date', todayStr)
-      .not('recurring_task_id', 'is', null)
-    const existingIds = new Set((existing ?? []).map((t) => t.recurring_task_id))
-
-    const missing = recurring.filter((rt) => !existingIds.has(rt.id))
-    if (missing.length === 0) return
-
-    const inserts = missing.map((rt) => ({
-      family_id: rt.family_id,
-      story_id: rt.story_id,
-      title: rt.title,
-      due_date: todayStr,
-      recurring_task_id: rt.id,
-      scheduled_start: rt.scheduled_start_time
-        ? new Date(`${todayStr}T${rt.scheduled_start_time}`).toISOString()
-        : null,
-      scheduled_end: rt.scheduled_end_time
-        ? new Date(`${todayStr}T${rt.scheduled_end_time}`).toISOString()
-        : null,
-    }))
-
-    await supabase.from('tasks').insert(inserts)
-  }
 
   async function load() {
     setLoading(true)
@@ -153,13 +120,42 @@ export function Today() {
     setAddingEvent(false)
   }
 
+  function toggleRepeatDay(day: number) {
+    setRepeatDays((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day].sort()))
+  }
+
   async function handleAddTask(e: FormEvent) {
     e.preventDefault()
     if (!newTask.trim() || !profile) return
 
     setAddingTask(true)
-    const todayStr = dateString(new Date())
+    const now = new Date()
+    const todayStr = dateString(now)
     const scheduleDate = showSchedule && newTaskDate ? newTaskDate : todayStr
+
+    if (showRepeat && repeatDays.length > 0) {
+      await createRecurringTask({
+        family_id: profile.family_id,
+        title: newTask.trim(),
+        days_of_week: repeatDays,
+        story_id: newTaskStoryId || null,
+        scheduled_start_time: showSchedule && newTaskStart ? newTaskStart : null,
+        scheduled_end_time: showSchedule && newTaskStart && newTaskEnd ? newTaskEnd : null,
+        created_by: profile.id,
+      })
+      await materializeRecurringTasks(todayStr, now.getDay())
+      setNewTask('')
+      setNewTaskStoryId('')
+      setShowSchedule(false)
+      setNewTaskDate('')
+      setNewTaskEnd('')
+      setShowRepeat(false)
+      setRepeatDays([])
+      await load()
+      setAddingTask(false)
+      return
+    }
+
     const insert: {
       family_id: string
       title: string
@@ -187,6 +183,8 @@ export function Today() {
       setShowSchedule(false)
       setNewTaskDate('')
       setNewTaskEnd('')
+      setShowRepeat(false)
+      setRepeatDays([])
       await load()
     }
     setAddingTask(false)
@@ -440,6 +438,36 @@ export function Today() {
                 className="text-xs text-forest hover:underline"
               >
                 + Schedule
+              </button>
+            )}
+            {showRepeat ? (
+              <div className="flex items-center gap-1">
+                {DAY_LABELS.map((label, day) => (
+                  <button
+                    key={day}
+                    type="button"
+                    onClick={() => toggleRepeatDay(day)}
+                    className={`h-7 w-7 rounded-full text-xs font-medium ${
+                      repeatDays.includes(day) ? 'bg-forest text-white' : 'bg-stone/10 text-stone hover:bg-stone/20'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowRepeat(false)
+                    setRepeatDays([])
+                  }}
+                  className="ml-1 text-xs text-stone hover:text-ink"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <button type="button" onClick={() => setShowRepeat(true)} className="text-xs text-forest hover:underline">
+                + Repeat
               </button>
             )}
           </form>

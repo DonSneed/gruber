@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { dateString, formatDateTime, toTimeInput } from '../lib/date'
 import { PhotoStrip } from '../components/PhotoStrip'
+import { createRecurringTask, DAY_LABELS, materializeRecurringTasks } from '../lib/recurring'
 import type { Profile, Story, Task, TaskAssignee } from '../lib/types'
 
 export function StoryDetail() {
@@ -23,6 +24,8 @@ export function StoryDetail() {
   const [newTaskDate, setNewTaskDate] = useState('')
   const [newTaskStart, setNewTaskStart] = useState('09:00')
   const [newTaskEnd, setNewTaskEnd] = useState('')
+  const [showRepeat, setShowRepeat] = useState(false)
+  const [repeatDays, setRepeatDays] = useState<number[]>([])
 
   const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null)
   const [scheduleDate, setScheduleDate] = useState('')
@@ -59,11 +62,39 @@ export function StoryDetail() {
     setLoading(false)
   }
 
+  function toggleRepeatDay(day: number) {
+    setRepeatDays((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day].sort()))
+  }
+
   async function handleAddTask(e: FormEvent) {
     e.preventDefault()
     if (!newTask.trim() || !profile || !id) return
 
     setAdding(true)
+
+    if (showRepeat && repeatDays.length > 0) {
+      await createRecurringTask({
+        family_id: profile.family_id,
+        title: newTask.trim(),
+        days_of_week: repeatDays,
+        story_id: id,
+        scheduled_start_time: showNewSchedule && newTaskStart ? newTaskStart : null,
+        scheduled_end_time: showNewSchedule && newTaskStart && newTaskEnd ? newTaskEnd : null,
+        created_by: profile.id,
+      })
+      const now = new Date()
+      await materializeRecurringTasks(dateString(now), now.getDay())
+      setNewTask('')
+      setShowNewSchedule(false)
+      setNewTaskDate('')
+      setNewTaskEnd('')
+      setShowRepeat(false)
+      setRepeatDays([])
+      await load(id)
+      setAdding(false)
+      return
+    }
+
     const insert: {
       family_id: string
       story_id: string
@@ -88,6 +119,8 @@ export function StoryDetail() {
       setShowNewSchedule(false)
       setNewTaskDate('')
       setNewTaskEnd('')
+      setShowRepeat(false)
+      setRepeatDays([])
       await load(id)
     }
     setAdding(false)
@@ -380,6 +413,36 @@ export function StoryDetail() {
                 className="text-xs text-forest hover:underline"
               >
                 + Add schedule
+              </button>
+            )}
+            {showRepeat ? (
+              <div className="flex items-center gap-1">
+                {DAY_LABELS.map((label, day) => (
+                  <button
+                    key={day}
+                    type="button"
+                    onClick={() => toggleRepeatDay(day)}
+                    className={`h-7 w-7 rounded-full text-xs font-medium ${
+                      repeatDays.includes(day) ? 'bg-forest text-white' : 'bg-stone/10 text-stone hover:bg-stone/20'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowRepeat(false)
+                    setRepeatDays([])
+                  }}
+                  className="ml-1 text-xs text-stone hover:text-ink"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <button type="button" onClick={() => setShowRepeat(true)} className="text-xs text-forest hover:underline">
+                + Repeat
               </button>
             )}
           </form>
