@@ -56,6 +56,20 @@ export interface TaskAssignee {
   profile_id: string
 }
 
+export interface Flag {
+  id: string
+  family_id: string
+  profile_id: string
+  name: string
+  color: string
+  created_at: string
+}
+
+export interface TaskFlag {
+  task_id: string
+  flag_id: string
+}
+
 export type EventVisibility = 'family' | 'private'
 
 export interface Event {

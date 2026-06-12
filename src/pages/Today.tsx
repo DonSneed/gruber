@@ -1,67 +1,125 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link } from 'react-router-dom'
-import { Clock, Repeat } from 'lucide-react'
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Clock, Repeat } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { Collapse } from '../components/Collapse'
+import { FlagPicker } from '../components/FlagPicker'
 import { colorForProfile } from '../lib/colors'
-import { dateString, endOfDay, formatTime, startOfDay, toTimeInput } from '../lib/date'
+import { addDays, dateString, endOfDay, formatTime, startOfDay, toTimeInput } from '../lib/date'
 import { createRecurringTask, DAY_LABELS, materializeRecurringTasks } from '../lib/recurring'
-import type { Event, Profile, Story, Task, TaskAssignee } from '../lib/types'
+import type { Event, Flag, Profile, Story, Task, TaskAssignee, TaskFlag, TaskStatus } from '../lib/types'
 
-type TimelineItem =
-  | { kind: 'event'; id: string; title: string; start: string; ownerId: string | null }
+const HOUR_HEIGHT = 56 // px per hour in the timeline
+const DEFAULT_HOUR_RANGE = { start: 6, end: 22 }
+
+type DisplayItem =
+  | { kind: 'event'; id: string; title: string; start: string; end: string; ownerId: string | null }
   | {
       kind: 'task'
       id: string
       title: string
-      start: string
+      start: string | null
+      end: string | null
+      status: TaskStatus
       assigneeIds: string[]
-      done: boolean
       storyId: string | null
     }
 
+function minutesSinceMidnight(iso: string): number {
+  const d = new Date(iso)
+  return d.getHours() * 60 + d.getMinutes()
+}
+
+// Greedily assigns side-by-side lanes to overlapping items so they share width instead of stacking.
+function layoutItems<T extends { startMin: number; endMin: number }>(
+  items: T[]
+): Array<T & { lane: number; totalLanes: number }> {
+  const sorted = [...items].sort((a, b) => a.startMin - b.startMin)
+  const result: Array<T & { lane: number; totalLanes: number }> = []
+  let cluster: T[] = []
+  let clusterEnd = -Infinity
+
+  function flush() {
+    const laneEnds: number[] = []
+    const lanes: number[] = []
+    for (const item of cluster) {
+      let lane = laneEnds.findIndex((end) => end <= item.startMin)
+      if (lane === -1) {
+        lane = laneEnds.length
+        laneEnds.push(item.endMin)
+      } else {
+        laneEnds[lane] = item.endMin
+      }
+      lanes.push(lane)
+    }
+    const totalLanes = laneEnds.length
+    cluster.forEach((item, i) => result.push({ ...item, lane: lanes[i], totalLanes }))
+    cluster = []
+  }
+
+  for (const item of sorted) {
+    if (cluster.length > 0 && item.startMin < clusterEnd) {
+      cluster.push(item)
+      clusterEnd = Math.max(clusterEnd, item.endMin)
+    } else {
+      if (cluster.length > 0) flush()
+      cluster.push(item)
+      clusterEnd = item.endMin
+    }
+  }
+  flush()
+  return result
+}
+
 export function Today() {
   const { profile } = useAuth()
+  const [viewedDate, setViewedDate] = useState(() => new Date())
+  const [hourRange, setHourRange] = useState(DEFAULT_HOUR_RANGE)
   const [members, setMembers] = useState<Profile[]>([])
   const [stories, setStories] = useState<Story[]>([])
   const [events, setEvents] = useState<Event[]>([])
   const [scheduledTasks, setScheduledTasks] = useState<Task[]>([])
   const [unscheduledTasks, setUnscheduledTasks] = useState<Task[]>([])
   const [assignees, setAssignees] = useState<TaskAssignee[]>([])
+  const [flags, setFlags] = useState<Flag[]>([])
+  const [taskFlags, setTaskFlags] = useState<TaskFlag[]>([])
+  const [activeFlagFilters, setActiveFlagFilters] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
 
-  const [eventTitle, setEventTitle] = useState('')
+  const [creationMode, setCreationMode] = useState<'task' | 'event'>('task')
+  const [submitting, setSubmitting] = useState(false)
+  const [formError, setFormError] = useState<string | null>(null)
+
   const [eventStart, setEventStart] = useState('09:00')
   const [eventEnd, setEventEnd] = useState('10:00')
-  const [addingEvent, setAddingEvent] = useState(false)
-  const [eventError, setEventError] = useState<string | null>(null)
 
   const [newTask, setNewTask] = useState('')
   const [newTaskStoryId, setNewTaskStoryId] = useState('')
-  const [addingTask, setAddingTask] = useState(false)
   const [showSchedule, setShowSchedule] = useState(false)
   const [newTaskDate, setNewTaskDate] = useState('')
   const [newTaskStart, setNewTaskStart] = useState('09:00')
   const [newTaskEnd, setNewTaskEnd] = useState('')
   const [showRepeat, setShowRepeat] = useState(false)
   const [repeatDays, setRepeatDays] = useState<number[]>([])
+  const [newTaskFlagIds, setNewTaskFlagIds] = useState<string[]>([])
+  const [showAllDay, setShowAllDay] = useState(false)
 
   useEffect(() => {
+    setHourRange(DEFAULT_HOUR_RANGE)
     load()
-  }, [])
+  }, [viewedDate])
 
   async function load() {
     setLoading(true)
-    const now = new Date()
-    const todayStr = dateString(now)
-    const dayStart = startOfDay(now).toISOString()
-    const dayEnd = endOfDay(now).toISOString()
+    const dayStr = dateString(viewedDate)
+    const dayStart = startOfDay(viewedDate).toISOString()
+    const dayEnd = endOfDay(viewedDate).toISOString()
 
-    await materializeRecurringTasks(todayStr, now.getDay())
+    await materializeRecurringTasks(dayStr, viewedDate.getDay())
 
-    const [membersRes, storiesRes, eventsRes, scheduledRes, unscheduledRes] = await Promise.all([
+    const [membersRes, storiesRes, eventsRes, scheduledRes, unscheduledRes, flagsRes] = await Promise.all([
       supabase.from('profiles').select('*').order('created_at'),
       supabase.from('stories').select('*').eq('status', 'active').order('created_at'),
       supabase.from('events').select('*').gte('start', dayStart).lte('start', dayEnd).order('start'),
@@ -71,7 +129,8 @@ export function Today() {
         .gte('scheduled_start', dayStart)
         .lte('scheduled_start', dayEnd)
         .order('scheduled_start'),
-      supabase.from('tasks').select('*').eq('due_date', todayStr).is('scheduled_start', null).order('created_at'),
+      supabase.from('tasks').select('*').eq('due_date', dayStr).is('scheduled_start', null).order('created_at'),
+      supabase.from('flags').select('*').order('created_at'),
     ])
 
     const loadedScheduled = scheduledRes.data ?? []
@@ -81,62 +140,70 @@ export function Today() {
     setEvents(eventsRes.data ?? [])
     setScheduledTasks(loadedScheduled)
     setUnscheduledTasks(loadedUnscheduled)
+    setFlags(flagsRes.data ?? [])
 
     const allTaskIds = [...loadedScheduled, ...loadedUnscheduled].map((t) => t.id)
     if (allTaskIds.length > 0) {
-      const { data } = await supabase.from('task_assignees').select('*').in('task_id', allTaskIds)
-      setAssignees(data ?? [])
+      const [assigneesRes, taskFlagsRes] = await Promise.all([
+        supabase.from('task_assignees').select('*').in('task_id', allTaskIds),
+        supabase.from('task_flags').select('*').in('task_id', allTaskIds),
+      ])
+      setAssignees(assigneesRes.data ?? [])
+      setTaskFlags(taskFlagsRes.data ?? [])
     } else {
       setAssignees([])
+      setTaskFlags([])
     }
     setLoading(false)
   }
 
-  async function handleAddEvent(e: FormEvent) {
-    e.preventDefault()
-    if (!eventTitle.trim() || !profile) return
+  async function handleAddEvent() {
+    if (!newTask.trim() || !profile) return
 
-    setAddingEvent(true)
-    setEventError(null)
+    setSubmitting(true)
+    setFormError(null)
 
     const [startH, startM] = eventStart.split(':').map(Number)
     const [endH, endM] = eventEnd.split(':').map(Number)
-    const start = new Date()
+    const start = new Date(viewedDate)
     start.setHours(startH, startM, 0, 0)
-    const end = new Date()
+    const end = new Date(viewedDate)
     end.setHours(endH, endM, 0, 0)
 
     const { error } = await supabase.from('events').insert({
       family_id: profile.family_id,
-      title: eventTitle.trim(),
+      title: newTask.trim(),
       start: start.toISOString(),
       end: end.toISOString(),
       owner_id: profile.id,
     })
     if (error) {
-      setEventError(error.message)
+      setFormError(error.message)
     } else {
-      setEventTitle('')
+      setNewTask('')
       await load()
     }
-    setAddingEvent(false)
+    setSubmitting(false)
   }
 
   function toggleRepeatDay(day: number) {
     setRepeatDays((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day].sort()))
   }
 
-  async function handleAddTask(e: FormEvent) {
-    e.preventDefault()
+  function toggleNewTaskFlag(flagId: string) {
+    setNewTaskFlagIds((prev) => (prev.includes(flagId) ? prev.filter((id) => id !== flagId) : [...prev, flagId]))
+  }
+
+  async function handleAddTask() {
     if (!newTask.trim() || !profile) return
 
-    setAddingTask(true)
-    const now = new Date()
-    const todayStr = dateString(now)
-    const scheduleDate = showSchedule && newTaskDate ? newTaskDate : todayStr
+    setSubmitting(true)
+    setFormError(null)
+    const dayStr = dateString(viewedDate)
+    const scheduleDate = showSchedule && newTaskDate ? newTaskDate : dayStr
 
     if (showRepeat && repeatDays.length > 0) {
-      await createRecurringTask({
+      const recurringTask = await createRecurringTask({
         family_id: profile.family_id,
         title: newTask.trim(),
         days_of_week: repeatDays,
@@ -145,7 +212,20 @@ export function Today() {
         scheduled_end_time: showSchedule && newTaskStart && newTaskEnd ? newTaskEnd : null,
         created_by: profile.id,
       })
-      await materializeRecurringTasks(todayStr, now.getDay())
+      await materializeRecurringTasks(dayStr, viewedDate.getDay())
+      if (newTaskFlagIds.length > 0) {
+        const { data: createdTask } = await supabase
+          .from('tasks')
+          .select('id')
+          .eq('recurring_task_id', recurringTask.id)
+          .eq('due_date', dayStr)
+          .maybeSingle()
+        if (createdTask) {
+          await supabase
+            .from('task_flags')
+            .insert(newTaskFlagIds.map((flagId) => ({ task_id: createdTask.id, flag_id: flagId })))
+        }
+      }
       setNewTask('')
       setNewTaskStoryId('')
       setShowSchedule(false)
@@ -153,8 +233,9 @@ export function Today() {
       setNewTaskEnd('')
       setShowRepeat(false)
       setRepeatDays([])
+      setNewTaskFlagIds([])
       await load()
-      setAddingTask(false)
+      setSubmitting(false)
       return
     }
 
@@ -178,8 +259,15 @@ export function Today() {
       }
     }
 
-    const { error } = await supabase.from('tasks').insert(insert)
-    if (!error) {
+    const { data: createdTask, error } = await supabase.from('tasks').insert(insert).select('id').single()
+    if (error) {
+      setFormError(error.message)
+    } else {
+      if (newTaskFlagIds.length > 0 && createdTask) {
+        await supabase
+          .from('task_flags')
+          .insert(newTaskFlagIds.map((flagId) => ({ task_id: createdTask.id, flag_id: flagId })))
+      }
       setNewTask('')
       setNewTaskStoryId('')
       setShowSchedule(false)
@@ -187,19 +275,29 @@ export function Today() {
       setNewTaskEnd('')
       setShowRepeat(false)
       setRepeatDays([])
+      setNewTaskFlagIds([])
       await load()
     }
-    setAddingTask(false)
+    setSubmitting(false)
   }
 
-  async function toggleTask(task: Task) {
-    const isDone = task.status !== 'done'
-    const completed_at = isDone ? new Date().toISOString() : null
-    const status = isDone ? 'done' : 'todo'
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault()
+    if (creationMode === 'event') {
+      await handleAddEvent()
+    } else {
+      await handleAddTask()
+    }
+  }
 
-    await supabase.from('tasks').update({ status, completed_at }).eq('id', task.id)
-    setUnscheduledTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, status, completed_at } : t)))
-    setScheduledTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, status, completed_at } : t)))
+  async function toggleTask(taskId: string, currentStatus: TaskStatus) {
+    const isDone = currentStatus !== 'done'
+    const completed_at = isDone ? new Date().toISOString() : null
+    const status: TaskStatus = isDone ? 'done' : 'todo'
+
+    await supabase.from('tasks').update({ status, completed_at }).eq('id', taskId)
+    setUnscheduledTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status, completed_at } : t)))
+    setScheduledTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status, completed_at } : t)))
   }
 
   async function deleteTask(taskId: string) {
@@ -208,26 +306,81 @@ export function Today() {
     setScheduledTasks((prev) => prev.filter((t) => t.id !== taskId))
   }
 
-  const memberIds = members.map((m) => m.id)
+  async function toggleTaskFlag(taskId: string, flagId: string) {
+    const isAssigned = taskFlags.some((tf) => tf.task_id === taskId && tf.flag_id === flagId)
+    if (isAssigned) {
+      await supabase.from('task_flags').delete().eq('task_id', taskId).eq('flag_id', flagId)
+      setTaskFlags((prev) => prev.filter((tf) => !(tf.task_id === taskId && tf.flag_id === flagId)))
+    } else {
+      await supabase.from('task_flags').insert({ task_id: taskId, flag_id: flagId })
+      setTaskFlags((prev) => [...prev, { task_id: taskId, flag_id: flagId }])
+    }
+  }
 
-  const timeline: TimelineItem[] = [
+  function toggleFlagFilter(flagId: string) {
+    setActiveFlagFilters((prev) =>
+      prev.includes(flagId) ? prev.filter((id) => id !== flagId) : [...prev, flagId]
+    )
+  }
+
+  const memberIds = members.map((m) => m.id)
+  const isToday = dateString(viewedDate) === dateString(new Date())
+
+  const taskMatchesFilter = (task: Task) =>
+    activeFlagFilters.length === 0 ||
+    taskFlags.some((tf) => tf.task_id === task.id && activeFlagFilters.includes(tf.flag_id))
+
+  const filteredScheduledTasks = scheduledTasks.filter(taskMatchesFilter)
+  const filteredUnscheduledTasks = unscheduledTasks.filter(taskMatchesFilter)
+
+  const items: DisplayItem[] = [
     ...events.map((e) => ({
       kind: 'event' as const,
       id: e.id,
       title: e.title,
       start: e.start,
+      end: e.end,
       ownerId: e.owner_id,
     })),
-    ...scheduledTasks.map((t) => ({
+    ...filteredScheduledTasks.map((t) => ({
       kind: 'task' as const,
       id: t.id,
       title: t.title,
       start: t.scheduled_start as string,
+      end: t.scheduled_end,
+      status: t.status,
       assigneeIds: assignees.filter((a) => a.task_id === t.id).map((a) => a.profile_id),
-      done: t.status === 'done',
       storyId: t.story_id,
     })),
-  ].sort((a, b) => a.start.localeCompare(b.start))
+    ...filteredUnscheduledTasks.map((t) => ({
+      kind: 'task' as const,
+      id: t.id,
+      title: t.title,
+      start: null,
+      end: null,
+      status: t.status,
+      assigneeIds: assignees.filter((a) => a.task_id === t.id).map((a) => a.profile_id),
+      storyId: t.story_id,
+    })),
+  ]
+
+  const timedItems = items.filter((item) => item.start !== null) as Array<DisplayItem & { start: string }>
+  const allDayTasks = items.filter(
+    (item): item is DisplayItem & { kind: 'task'; start: null } => item.kind === 'task' && item.start === null
+  )
+  const allDayDoneCount = allDayTasks.filter((t) => t.status === 'done').length
+
+  const totalHeight = (hourRange.end - hourRange.start) * HOUR_HEIGHT
+  const rangeStartMin = hourRange.start * 60
+  const hours = Array.from({ length: hourRange.end - hourRange.start }, (_, i) => hourRange.start + i)
+
+  const laidOutItems = layoutItems(
+    timedItems.map((item) => {
+      const startMin = minutesSinceMidnight(item.start)
+      const endMin = item.end ? minutesSinceMidnight(item.end) : startMin + 30
+      return { item, startMin, endMin: Math.max(endMin, startMin + 15) }
+    })
+  )
 
   if (loading) {
     return <div className="px-4 py-8 text-sm text-on-page/60">Loading...</div>
@@ -242,36 +395,94 @@ export function Today() {
             Settings
           </Link>
         </div>
-        <p className="text-sm text-on-page/60">
-          {new Date().toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })}
-        </p>
 
         <div className="rounded-lg bg-cream p-4 text-ink shadow">
-          <h2 className="mb-2 font-medium">Today's schedule</h2>
-          {timeline.length === 0 && <p className="text-sm text-stone">Nothing scheduled today.</p>}
-          <ul className="space-y-2">
-            {timeline.map((item) => {
-              const color =
-                item.kind === 'event'
-                  ? colorForProfile(item.ownerId, memberIds)
-                  : colorForProfile(null, memberIds)
-              return (
-                <li key={`${item.kind}-${item.id}`} className="flex items-start gap-3">
-                  <span className="w-12 shrink-0 text-xs text-stone">{formatTime(item.start)}</span>
-                  {item.kind === 'event' ? (
-                    <span className={`flex-1 rounded px-2 py-1 text-sm ${color.bg} ${color.text}`}>
-                      {item.title}
-                    </span>
-                  ) : (
-                    <span className={`flex-1 text-sm ${item.done ? 'text-stone line-through' : ''}`}>
-                      {item.storyId ? (
-                        <Link to={`/stories/${item.storyId}`} className="hover:underline">
-                          {item.title}
-                        </Link>
-                      ) : (
-                        item.title
-                      )}
-                      <span className="ml-2 inline-flex gap-1">
+          <div className="mb-2 flex items-center justify-between">
+            <button
+              onClick={() => setViewedDate((d) => addDays(d, -1))}
+              className="rounded p-1 text-stone hover:bg-stone/10"
+              title="Previous day"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <div className="text-center">
+              <h2 className="font-medium">
+                {viewedDate.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })}
+              </h2>
+              {!isToday && (
+                <button
+                  onClick={() => setViewedDate(new Date())}
+                  className="text-xs text-forest hover:underline"
+                >
+                  Jump to today
+                </button>
+              )}
+            </div>
+            <button
+              onClick={() => setViewedDate((d) => addDays(d, 1))}
+              className="rounded p-1 text-stone hover:bg-stone/10"
+              title="Next day"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+
+          {flags.length > 0 && (
+            <div className="mb-2 flex flex-wrap gap-1">
+              {flags.map((flag) => {
+                const active = activeFlagFilters.includes(flag.id)
+                return (
+                  <button
+                    key={flag.id}
+                    type="button"
+                    onClick={() => toggleFlagFilter(flag.id)}
+                    className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs ${
+                      active ? 'text-white' : 'text-stone ring-1 ring-inset ring-stone/30 hover:bg-stone/10'
+                    }`}
+                    style={active ? { backgroundColor: flag.color } : undefined}
+                  >
+                    {flag.name}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+
+          {items.length === 0 && (
+            <p className="text-sm text-stone">
+              {activeFlagFilters.length === 0 ? 'Nothing today.' : 'Nothing with these flags.'}
+            </p>
+          )}
+
+          {allDayTasks.length > 0 && (
+            <div className="mb-2 border-b border-stone/10 pb-2">
+              <button
+                type="button"
+                onClick={() => setShowAllDay((prev) => !prev)}
+                className="w-full rounded bg-stone/10 px-2 py-1 text-left text-xs font-medium text-stone hover:bg-stone/20"
+              >
+                Today's stuff ({allDayDoneCount}/{allDayTasks.length})
+              </button>
+              <Collapse open={showAllDay}>
+                <ul className="mt-1 space-y-1">
+                  {allDayTasks.map((item) => (
+                    <li key={`task-${item.id}`} className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={item.status === 'done'}
+                        onChange={() => toggleTask(item.id, item.status)}
+                        className="h-4 w-4 shrink-0 accent-forest"
+                      />
+                      <span className={`flex-1 text-sm ${item.status === 'done' ? 'text-stone line-through' : ''}`}>
+                        {item.storyId ? (
+                          <Link to={`/stories/${item.storyId}`} className="hover:underline">
+                            {item.title}
+                          </Link>
+                        ) : (
+                          item.title
+                        )}
+                      </span>
+                      <span className="inline-flex gap-1">
                         {item.assigneeIds.map((id) => (
                           <span
                             key={id}
@@ -279,193 +490,266 @@ export function Today() {
                           />
                         ))}
                       </span>
-                    </span>
-                  )}
-                  {item.kind === 'task' && (
-                    <button
-                      onClick={() => deleteTask(item.id)}
-                      className="shrink-0 text-xs text-stone hover:text-red-600"
-                      title="Delete task"
-                    >
-                      &times;
-                    </button>
-                  )}
-                </li>
-              )
-            })}
-          </ul>
+                      <FlagPicker
+                        flags={flags}
+                        assignedFlagIds={taskFlags.filter((tf) => tf.task_id === item.id).map((tf) => tf.flag_id)}
+                        onToggle={(flagId) => toggleTaskFlag(item.id, flagId)}
+                      />
+                      <button
+                        onClick={() => deleteTask(item.id)}
+                        className="shrink-0 text-xs text-stone hover:text-red-600"
+                        title="Delete task"
+                      >
+                        &times;
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </Collapse>
+            </div>
+          )}
 
-          <form onSubmit={handleAddEvent} className="mt-3 space-y-2 border-t pt-3">
-            <input
-              type="text"
-              placeholder="Event title"
-              value={eventTitle}
-              onChange={(e) => setEventTitle(e.target.value)}
-              className="w-full rounded border border-stone/30 px-3 py-1.5 text-sm focus:border-forest focus:outline-none"
-            />
-            <div className="flex gap-2">
-              <input
-                type="time"
-                value={eventStart}
-                onChange={(e) => setEventStart(e.target.value)}
-                className="flex-1 rounded border border-stone/30 px-2 py-1.5 text-sm focus:border-forest focus:outline-none"
-              />
-              <input
-                type="time"
-                value={eventEnd}
-                onChange={(e) => setEventEnd(e.target.value)}
-                className="flex-1 rounded border border-stone/30 px-2 py-1.5 text-sm focus:border-forest focus:outline-none"
-              />
-              <button
-                type="submit"
-                disabled={addingEvent || !eventTitle.trim()}
-                className="rounded bg-forest px-3 py-1.5 text-sm font-medium text-white hover:bg-ink disabled:opacity-50"
+          {hourRange.start > 0 && (
+            <button
+              onClick={() => setHourRange((r) => ({ ...r, start: Math.max(0, r.start - 2) }))}
+              className="mb-1 flex w-full items-center justify-center gap-1 text-xs text-stone hover:text-forest"
+            >
+              <ChevronUp className="h-3 w-3" /> Earlier
+            </button>
+          )}
+
+          <div className="relative overflow-hidden" style={{ height: totalHeight }}>
+            {hours.map((h) => (
+              <div
+                key={h}
+                className="absolute left-0 right-0 border-t border-stone/10"
+                style={{ top: (h - hourRange.start) * HOUR_HEIGHT }}
               >
-                Add
+                <span className="absolute -top-2 left-0 bg-cream px-0.5 text-[10px] text-stone">
+                  {String(h).padStart(2, '0')}:00
+                </span>
+              </div>
+            ))}
+
+            <div className="absolute left-10 right-0 top-0" style={{ height: totalHeight }}>
+              {laidOutItems.map(({ item, startMin, endMin, lane, totalLanes }) => {
+                const top = ((startMin - rangeStartMin) / 60) * HOUR_HEIGHT
+                const height = Math.max(((endMin - startMin) / 60) * HOUR_HEIGHT, 22)
+                const widthPct = 100 / totalLanes
+                const leftPct = lane * widthPct
+                const style = {
+                  top,
+                  height,
+                  left: `${leftPct}%`,
+                  width: `calc(${widthPct}% - 2px)`,
+                }
+
+                if (item.kind === 'event') {
+                  const color = colorForProfile(item.ownerId, memberIds)
+                  return (
+                    <div
+                      key={`event-${item.id}`}
+                      className={`absolute overflow-hidden rounded px-1.5 py-0.5 text-xs ${color.bg} ${color.text}`}
+                      style={style}
+                    >
+                      <span className="font-medium">{formatTime(item.start)}</span> {item.title}
+                    </div>
+                  )
+                }
+
+                return (
+                  <div
+                    key={`task-${item.id}`}
+                    className="absolute flex items-center gap-1 overflow-hidden rounded bg-stone/10 px-1.5 text-xs"
+                    style={style}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={item.status === 'done'}
+                      onChange={() => toggleTask(item.id, item.status)}
+                      className="h-3 w-3 shrink-0 accent-forest"
+                    />
+                    <span className={`truncate ${item.status === 'done' ? 'text-stone line-through' : ''}`}>
+                      {item.storyId ? (
+                        <Link to={`/stories/${item.storyId}`} className="hover:underline">
+                          {item.title}
+                        </Link>
+                      ) : (
+                        item.title
+                      )}
+                    </span>
+                    <span className="ml-auto inline-flex shrink-0 gap-0.5">
+                      {item.assigneeIds.map((id) => (
+                        <span
+                          key={id}
+                          className={`inline-block h-1.5 w-1.5 rounded-full ${colorForProfile(id, memberIds).dot}`}
+                        />
+                      ))}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          {hourRange.end < 24 && (
+            <button
+              onClick={() => setHourRange((r) => ({ ...r, end: Math.min(24, r.end + 2) }))}
+              className="mt-1 flex w-full items-center justify-center gap-1 text-xs text-stone hover:text-forest"
+            >
+              <ChevronDown className="h-3 w-3" /> Later
+            </button>
+          )}
+
+          <form onSubmit={handleSubmit} className="mt-3 space-y-2 border-t pt-3">
+            <div className="flex gap-1">
+              <button
+                type="button"
+                onClick={() => setCreationMode('task')}
+                className={`rounded px-2 py-1 text-xs font-medium ${
+                  creationMode === 'task' ? 'bg-forest text-white' : 'bg-stone/10 text-stone hover:bg-stone/20'
+                }`}
+              >
+                Task
+              </button>
+              <button
+                type="button"
+                onClick={() => setCreationMode('event')}
+                className={`rounded px-2 py-1 text-xs font-medium ${
+                  creationMode === 'event' ? 'bg-forest text-white' : 'bg-stone/10 text-stone hover:bg-stone/20'
+                }`}
+              >
+                Event
               </button>
             </div>
-            {eventError && <p className="text-sm text-red-600">{eventError}</p>}
-          </form>
-        </div>
-
-        <div className="rounded-lg bg-cream p-4 text-ink shadow">
-          <h2 className="mb-2 font-medium">To do today</h2>
-          {unscheduledTasks.length === 0 && <p className="text-sm text-stone">Nothing on the list.</p>}
-          <ul className="space-y-2">
-            {unscheduledTasks.map((task) => (
-              <li key={task.id} className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={task.status === 'done'}
-                  onChange={() => toggleTask(task)}
-                  className="h-4 w-4 shrink-0 accent-forest"
-                />
-                <span className={`flex-1 text-sm ${task.status === 'done' ? 'text-stone line-through' : ''}`}>
-                  {task.story_id ? (
-                    <Link to={`/stories/${task.story_id}`} className="hover:underline">
-                      {task.title}
-                    </Link>
-                  ) : (
-                    task.title
-                  )}
-                </span>
-                <span className="inline-flex gap-1">
-                  {assignees
-                    .filter((a) => a.task_id === task.id)
-                    .map((a) => (
-                      <span
-                        key={a.profile_id}
-                        className={`inline-block h-2 w-2 rounded-full ${colorForProfile(a.profile_id, memberIds).dot}`}
-                      />
-                    ))}
-                </span>
-                <button
-                  onClick={() => deleteTask(task.id)}
-                  className="shrink-0 text-xs text-stone hover:text-red-600"
-                  title="Delete task"
-                >
-                  &times;
-                </button>
-              </li>
-            ))}
-          </ul>
-
-          <form onSubmit={handleAddTask} className="mt-3 space-y-2">
             <input
               type="text"
-              placeholder="Add something for today..."
+              placeholder={creationMode === 'event' ? 'Event title' : 'Add something for today...'}
               value={newTask}
               onChange={(e) => setNewTask(e.target.value)}
               className="w-full rounded border border-stone/30 px-3 py-1.5 text-sm focus:border-forest focus:outline-none"
             />
-            <div className="flex gap-2">
-              {stories.length > 0 && (
-                <select
-                  value={newTaskStoryId}
-                  onChange={(e) => setNewTaskStoryId(e.target.value)}
+
+            {creationMode === 'event' ? (
+              <div className="flex gap-2">
+                <input
+                  type="time"
+                  value={eventStart}
+                  onChange={(e) => setEventStart(e.target.value)}
                   className="flex-1 rounded border border-stone/30 px-2 py-1.5 text-sm focus:border-forest focus:outline-none"
+                />
+                <input
+                  type="time"
+                  value={eventEnd}
+                  onChange={(e) => setEventEnd(e.target.value)}
+                  className="flex-1 rounded border border-stone/30 px-2 py-1.5 text-sm focus:border-forest focus:outline-none"
+                />
+                <button
+                  type="submit"
+                  disabled={submitting || !newTask.trim()}
+                  className="rounded bg-forest px-3 py-1.5 text-sm font-medium text-white hover:bg-ink disabled:opacity-50"
                 >
-                  <option value="">No story</option>
-                  {stories.map((story) => (
-                    <option key={story.id} value={story.id}>
-                      {story.title}
-                    </option>
-                  ))}
-                </select>
-              )}
-              <button
-                type="submit"
-                disabled={addingTask || !newTask.trim()}
-                className="rounded bg-forest px-3 py-1.5 text-sm font-medium text-white hover:bg-ink disabled:opacity-50"
-              >
-                Add
-              </button>
-            </div>
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={() => {
-                  if (!showSchedule) {
-                    setNewTaskDate(dateString(new Date()))
-                    setNewTaskStart(toTimeInput(new Date()))
-                  }
-                  setShowSchedule((prev) => !prev)
-                }}
-                title="Schedule"
-                className={`rounded p-1.5 ${
-                  showSchedule ? 'bg-forest text-white' : 'text-stone hover:bg-stone/10'
-                }`}
-              >
-                <Clock className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowRepeat((prev) => !prev)}
-                title="Repeat"
-                className={`rounded p-1.5 ${showRepeat ? 'bg-forest text-white' : 'text-stone hover:bg-stone/10'}`}
-              >
-                <Repeat className="h-4 w-4" />
-              </button>
-            </div>
-            <Collapse open={showSchedule}>
-              <div className="flex items-center gap-2">
-                <input
-                  type="date"
-                  value={newTaskDate}
-                  onChange={(e) => setNewTaskDate(e.target.value)}
-                  className="rounded border border-stone/30 px-2 py-1 text-xs focus:border-forest focus:outline-none"
-                />
-                <input
-                  type="time"
-                  value={newTaskStart}
-                  onChange={(e) => setNewTaskStart(e.target.value)}
-                  className="rounded border border-stone/30 px-2 py-1 text-xs focus:border-forest focus:outline-none"
-                />
-                <span className="text-xs text-stone">to</span>
-                <input
-                  type="time"
-                  value={newTaskEnd}
-                  onChange={(e) => setNewTaskEnd(e.target.value)}
-                  className="rounded border border-stone/30 px-2 py-1 text-xs focus:border-forest focus:outline-none"
-                />
+                  Add
+                </button>
               </div>
-            </Collapse>
-            <Collapse open={showRepeat}>
-              <div className="flex items-center gap-1">
-                {DAY_LABELS.map((label, day) => (
+            ) : (
+              <>
+                <div className="flex gap-2">
+                  {stories.length > 0 && (
+                    <select
+                      value={newTaskStoryId}
+                      onChange={(e) => setNewTaskStoryId(e.target.value)}
+                      className="flex-1 rounded border border-stone/30 px-2 py-1.5 text-sm focus:border-forest focus:outline-none"
+                    >
+                      <option value="">No story</option>
+                      {stories.map((story) => (
+                        <option key={story.id} value={story.id}>
+                          {story.title}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                   <button
-                    key={day}
+                    type="submit"
+                    disabled={submitting || !newTask.trim()}
+                    className="rounded bg-forest px-3 py-1.5 text-sm font-medium text-white hover:bg-ink disabled:opacity-50"
+                  >
+                    Add
+                  </button>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button
                     type="button"
-                    onClick={() => toggleRepeatDay(day)}
-                    className={`h-7 w-7 rounded-full text-xs font-medium ${
-                      repeatDays.includes(day) ? 'bg-forest text-white' : 'bg-stone/10 text-stone hover:bg-stone/20'
+                    onClick={() => {
+                      if (!showSchedule) {
+                        setNewTaskDate(dateString(viewedDate))
+                        setNewTaskStart(toTimeInput(new Date()))
+                      }
+                      setShowSchedule((prev) => !prev)
+                    }}
+                    title="Schedule"
+                    className={`rounded p-1.5 ${
+                      showSchedule ? 'bg-forest text-white' : 'text-stone hover:bg-stone/10'
                     }`}
                   >
-                    {label}
+                    <Clock className="h-4 w-4" />
                   </button>
-                ))}
-              </div>
-            </Collapse>
+                  <button
+                    type="button"
+                    onClick={() => setShowRepeat((prev) => !prev)}
+                    title="Repeat"
+                    className={`rounded p-1.5 ${
+                      showRepeat ? 'bg-forest text-white' : 'text-stone hover:bg-stone/10'
+                    }`}
+                  >
+                    <Repeat className="h-4 w-4" />
+                  </button>
+                  <FlagPicker flags={flags} assignedFlagIds={newTaskFlagIds} onToggle={toggleNewTaskFlag} />
+                </div>
+                <Collapse open={showSchedule}>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="date"
+                      value={newTaskDate}
+                      onChange={(e) => setNewTaskDate(e.target.value)}
+                      className="rounded border border-stone/30 px-2 py-1 text-xs focus:border-forest focus:outline-none"
+                    />
+                    <input
+                      type="time"
+                      value={newTaskStart}
+                      onChange={(e) => setNewTaskStart(e.target.value)}
+                      className="rounded border border-stone/30 px-2 py-1 text-xs focus:border-forest focus:outline-none"
+                    />
+                    <span className="text-xs text-stone">to</span>
+                    <input
+                      type="time"
+                      value={newTaskEnd}
+                      onChange={(e) => setNewTaskEnd(e.target.value)}
+                      className="rounded border border-stone/30 px-2 py-1 text-xs focus:border-forest focus:outline-none"
+                    />
+                  </div>
+                </Collapse>
+                <Collapse open={showRepeat}>
+                  <div className="flex items-center gap-1">
+                    {DAY_LABELS.map((label, day) => (
+                      <button
+                        key={day}
+                        type="button"
+                        onClick={() => toggleRepeatDay(day)}
+                        className={`h-7 w-7 rounded-full text-xs font-medium ${
+                          repeatDays.includes(day)
+                            ? 'bg-forest text-white'
+                            : 'bg-stone/10 text-stone hover:bg-stone/20'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </Collapse>
+              </>
+            )}
+            {formError && <p className="text-sm text-red-600">{formError}</p>}
           </form>
         </div>
       </div>

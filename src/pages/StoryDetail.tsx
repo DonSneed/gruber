@@ -5,10 +5,11 @@ import { Clock, Image as ImageIcon, Repeat, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { Collapse } from '../components/Collapse'
+import { FlagPicker } from '../components/FlagPicker'
 import { dateString, formatDateTime, toTimeInput } from '../lib/date'
 import { PhotoStrip } from '../components/PhotoStrip'
 import { createRecurringTask, DAY_LABELS, materializeRecurringTasks } from '../lib/recurring'
-import type { Profile, Story, Task, TaskAssignee } from '../lib/types'
+import type { Flag, Profile, Story, Task, TaskAssignee, TaskFlag } from '../lib/types'
 
 export function StoryDetail() {
   const { id } = useParams<{ id: string }>()
@@ -18,6 +19,8 @@ export function StoryDetail() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [members, setMembers] = useState<Profile[]>([])
   const [assignees, setAssignees] = useState<TaskAssignee[]>([])
+  const [flags, setFlags] = useState<Flag[]>([])
+  const [taskFlags, setTaskFlags] = useState<TaskFlag[]>([])
   const [loading, setLoading] = useState(true)
   const [newTask, setNewTask] = useState('')
   const [adding, setAdding] = useState(false)
@@ -28,6 +31,7 @@ export function StoryDetail() {
   const [newTaskEnd, setNewTaskEnd] = useState('')
   const [showRepeat, setShowRepeat] = useState(false)
   const [repeatDays, setRepeatDays] = useState<number[]>([])
+  const [newTaskFlagIds, setNewTaskFlagIds] = useState<string[]>([])
 
   const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null)
   const [scheduleDate, setScheduleDate] = useState('')
@@ -42,30 +46,38 @@ export function StoryDetail() {
 
   async function load(storyId: string) {
     setLoading(true)
-    const [storyRes, tasksRes, membersRes] = await Promise.all([
+    const [storyRes, tasksRes, membersRes, flagsRes] = await Promise.all([
       supabase.from('stories').select('*').eq('id', storyId).maybeSingle(),
       supabase.from('tasks').select('*').eq('story_id', storyId).order('created_at'),
       supabase.from('profiles').select('*').order('created_at'),
+      supabase.from('flags').select('*').order('created_at'),
     ])
     setStory(storyRes.data)
     const loadedTasks = tasksRes.data ?? []
     setTasks(loadedTasks)
     setMembers(membersRes.data ?? [])
+    setFlags(flagsRes.data ?? [])
 
     if (loadedTasks.length > 0) {
-      const { data: assigneeRows } = await supabase
-        .from('task_assignees')
-        .select('*')
-        .in('task_id', loadedTasks.map((t) => t.id))
-      setAssignees(assigneeRows ?? [])
+      const [assigneeRows, taskFlagRows] = await Promise.all([
+        supabase.from('task_assignees').select('*').in('task_id', loadedTasks.map((t) => t.id)),
+        supabase.from('task_flags').select('*').in('task_id', loadedTasks.map((t) => t.id)),
+      ])
+      setAssignees(assigneeRows.data ?? [])
+      setTaskFlags(taskFlagRows.data ?? [])
     } else {
       setAssignees([])
+      setTaskFlags([])
     }
     setLoading(false)
   }
 
   function toggleRepeatDay(day: number) {
     setRepeatDays((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day].sort()))
+  }
+
+  function toggleNewTaskFlag(flagId: string) {
+    setNewTaskFlagIds((prev) => (prev.includes(flagId) ? prev.filter((fid) => fid !== flagId) : [...prev, flagId]))
   }
 
   async function handleAddTask(e: FormEvent) {
@@ -75,7 +87,7 @@ export function StoryDetail() {
     setAdding(true)
 
     if (showRepeat && repeatDays.length > 0) {
-      await createRecurringTask({
+      const recurringTask = await createRecurringTask({
         family_id: profile.family_id,
         title: newTask.trim(),
         days_of_week: repeatDays,
@@ -85,13 +97,28 @@ export function StoryDetail() {
         created_by: profile.id,
       })
       const now = new Date()
-      await materializeRecurringTasks(dateString(now), now.getDay())
+      const todayStr = dateString(now)
+      await materializeRecurringTasks(todayStr, now.getDay())
+      if (newTaskFlagIds.length > 0) {
+        const { data: createdTask } = await supabase
+          .from('tasks')
+          .select('id')
+          .eq('recurring_task_id', recurringTask.id)
+          .eq('due_date', todayStr)
+          .maybeSingle()
+        if (createdTask) {
+          await supabase
+            .from('task_flags')
+            .insert(newTaskFlagIds.map((flagId) => ({ task_id: createdTask.id, flag_id: flagId })))
+        }
+      }
       setNewTask('')
       setShowNewSchedule(false)
       setNewTaskDate('')
       setNewTaskEnd('')
       setShowRepeat(false)
       setRepeatDays([])
+      setNewTaskFlagIds([])
       await load(id)
       setAdding(false)
       return
@@ -115,14 +142,20 @@ export function StoryDetail() {
       }
     }
 
-    const { error } = await supabase.from('tasks').insert(insert)
+    const { data: createdTask, error } = await supabase.from('tasks').insert(insert).select('id').single()
     if (!error) {
+      if (newTaskFlagIds.length > 0 && createdTask) {
+        await supabase
+          .from('task_flags')
+          .insert(newTaskFlagIds.map((flagId) => ({ task_id: createdTask.id, flag_id: flagId })))
+      }
       setNewTask('')
       setShowNewSchedule(false)
       setNewTaskDate('')
       setNewTaskEnd('')
       setShowRepeat(false)
       setRepeatDays([])
+      setNewTaskFlagIds([])
       await load(id)
     }
     setAdding(false)
@@ -151,6 +184,18 @@ export function StoryDetail() {
     } else {
       await supabase.from('task_assignees').insert({ task_id: taskId, profile_id: profileId })
       setAssignees((prev) => [...prev, { task_id: taskId, profile_id: profileId }])
+    }
+  }
+
+  async function toggleTaskFlag(taskId: string, flagId: string) {
+    const isAssigned = taskFlags.some((tf) => tf.task_id === taskId && tf.flag_id === flagId)
+
+    if (isAssigned) {
+      await supabase.from('task_flags').delete().eq('task_id', taskId).eq('flag_id', flagId)
+      setTaskFlags((prev) => prev.filter((tf) => !(tf.task_id === taskId && tf.flag_id === flagId)))
+    } else {
+      await supabase.from('task_flags').insert({ task_id: taskId, flag_id: flagId })
+      setTaskFlags((prev) => [...prev, { task_id: taskId, flag_id: flagId }])
     }
   }
 
@@ -332,6 +377,11 @@ export function StoryDetail() {
                   >
                     <ImageIcon className="h-3.5 w-3.5" />
                   </button>
+                  <FlagPicker
+                    flags={flags}
+                    assignedFlagIds={taskFlags.filter((tf) => tf.task_id === task.id).map((tf) => tf.flag_id)}
+                    onToggle={(flagId) => toggleTaskFlag(task.id, flagId)}
+                  />
                 </div>
 
                 <Collapse open={editingScheduleId === task.id}>
@@ -419,6 +469,7 @@ export function StoryDetail() {
               >
                 <Repeat className="h-4 w-4" />
               </button>
+              <FlagPicker flags={flags} assignedFlagIds={newTaskFlagIds} onToggle={toggleNewTaskFlag} />
             </div>
             <Collapse open={showNewSchedule}>
               <div className="flex items-center gap-2">

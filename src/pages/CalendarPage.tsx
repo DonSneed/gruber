@@ -11,7 +11,7 @@ type TimelineItem =
       kind: 'task'
       id: string
       title: string
-      start: string
+      start: string | null
       assigneeIds: string[]
       done: boolean
       storyId: string | null
@@ -22,6 +22,7 @@ export function CalendarPage() {
   const [members, setMembers] = useState<Profile[]>([])
   const [events, setEvents] = useState<Event[]>([])
   const [scheduledTasks, setScheduledTasks] = useState<Task[]>([])
+  const [unscheduledTasks, setUnscheduledTasks] = useState<Task[]>([])
   const [assignees, setAssignees] = useState<TaskAssignee[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -33,8 +34,10 @@ export function CalendarPage() {
     setLoading(true)
     const rangeStart = startOfDay(weekStart).toISOString()
     const rangeEnd = endOfDay(addDays(weekStart, 6)).toISOString()
+    const dueStart = dateString(weekStart)
+    const dueEnd = dateString(addDays(weekStart, 6))
 
-    const [membersRes, eventsRes, scheduledRes] = await Promise.all([
+    const [membersRes, eventsRes, scheduledRes, unscheduledRes] = await Promise.all([
       supabase.from('profiles').select('*').order('created_at'),
       supabase.from('events').select('*').gte('start', rangeStart).lte('start', rangeEnd).order('start'),
       supabase
@@ -43,18 +46,25 @@ export function CalendarPage() {
         .gte('scheduled_start', rangeStart)
         .lte('scheduled_start', rangeEnd)
         .order('scheduled_start'),
+      supabase
+        .from('tasks')
+        .select('*')
+        .gte('due_date', dueStart)
+        .lte('due_date', dueEnd)
+        .is('scheduled_start', null)
+        .order('created_at'),
     ])
 
     const loadedScheduled = scheduledRes.data ?? []
+    const loadedUnscheduled = unscheduledRes.data ?? []
     setMembers(membersRes.data ?? [])
     setEvents(eventsRes.data ?? [])
     setScheduledTasks(loadedScheduled)
+    setUnscheduledTasks(loadedUnscheduled)
 
-    if (loadedScheduled.length > 0) {
-      const { data } = await supabase
-        .from('task_assignees')
-        .select('*')
-        .in('task_id', loadedScheduled.map((t) => t.id))
+    const allTaskIds = [...loadedScheduled, ...loadedUnscheduled].map((t) => t.id)
+    if (allTaskIds.length > 0) {
+      const { data } = await supabase.from('task_assignees').select('*').in('task_id', allTaskIds)
       setAssignees(data ?? [])
     } else {
       setAssignees([])
@@ -85,8 +95,25 @@ export function CalendarPage() {
       storyId: t.story_id,
     })
   }
+  for (const t of unscheduledTasks) {
+    const key = t.due_date as string
+    itemsByDay.get(key)?.push({
+      kind: 'task',
+      id: t.id,
+      title: t.title,
+      start: null,
+      assigneeIds: assignees.filter((a) => a.task_id === t.id).map((a) => a.profile_id),
+      done: t.status === 'done',
+      storyId: t.story_id,
+    })
+  }
   for (const items of itemsByDay.values()) {
-    items.sort((a, b) => a.start.localeCompare(b.start))
+    items.sort((a, b) => {
+      if (a.start === null && b.start === null) return 0
+      if (a.start === null) return 1
+      if (b.start === null) return -1
+      return a.start.localeCompare(b.start)
+    })
   }
 
   return (
@@ -140,7 +167,9 @@ export function CalendarPage() {
                         : colorForProfile(null, memberIds)
                     return (
                       <li key={`${item.kind}-${item.id}`} className="flex items-start gap-3">
-                        <span className="w-12 shrink-0 text-xs text-stone">{formatTime(item.start)}</span>
+                        <span className="w-12 shrink-0 text-xs text-stone">
+                          {item.start ? formatTime(item.start) : ''}
+                        </span>
                         {item.kind === 'event' ? (
                           <span className={`flex-1 rounded px-2 py-1 text-sm ${color.bg} ${color.text}`}>
                             {item.title}

@@ -10,6 +10,9 @@ import { Stories } from './pages/Stories'
 import { StoryDetail } from './pages/StoryDetail'
 import { CalendarPage } from './pages/CalendarPage'
 import { Settings } from './pages/Settings'
+import { SettingsMembers } from './pages/SettingsMembers'
+import { SettingsTheme } from './pages/SettingsTheme'
+import { SettingsFlags } from './pages/SettingsFlags'
 
 function AppRoutes() {
   const { loading } = useAuth()
@@ -33,6 +36,9 @@ function AppRoutes() {
         <Route path="/stories/:id" element={<StoryDetail />} />
         <Route path="/calendar" element={<CalendarPage />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/settings/members" element={<SettingsMembers />} />
+        <Route path="/settings/theme" element={<SettingsTheme />} />
+        <Route path="/settings/flags" element={<SettingsFlags />} />
       </Route>
     </Routes>
   )
