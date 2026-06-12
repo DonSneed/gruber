@@ -163,7 +163,7 @@ export function StoryDetail() {
       setScheduleEnd(task.scheduled_end ? toTimeInput(new Date(task.scheduled_end)) : '')
     } else {
       setScheduleDate(dateString(new Date()))
-      setScheduleStart('09:00')
+      setScheduleStart(toTimeInput(new Date()))
       setScheduleEnd('')
     }
   }
@@ -398,7 +398,10 @@ export function StoryDetail() {
               <button
                 type="button"
                 onClick={() => {
-                  if (!showNewSchedule) setNewTaskDate(dateString(new Date()))
+                  if (!showNewSchedule) {
+                    setNewTaskDate(dateString(new Date()))
+                    setNewTaskStart(toTimeInput(new Date()))
+                  }
                   setShowNewSchedule((prev) => !prev)
                 }}
                 title="Schedule"

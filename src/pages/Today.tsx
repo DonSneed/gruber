@@ -6,7 +6,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { Collapse } from '../components/Collapse'
 import { colorForProfile } from '../lib/colors'
-import { dateString, endOfDay, formatTime, startOfDay } from '../lib/date'
+import { dateString, endOfDay, formatTime, startOfDay, toTimeInput } from '../lib/date'
 import { createRecurringTask, DAY_LABELS, materializeRecurringTasks } from '../lib/recurring'
 import type { Event, Profile, Story, Task, TaskAssignee } from '../lib/types'
 
@@ -405,7 +405,10 @@ export function Today() {
               <button
                 type="button"
                 onClick={() => {
-                  if (!showSchedule) setNewTaskDate(dateString(new Date()))
+                  if (!showSchedule) {
+                    setNewTaskDate(dateString(new Date()))
+                    setNewTaskStart(toTimeInput(new Date()))
+                  }
                   setShowSchedule((prev) => !prev)
                 }}
                 title="Schedule"
