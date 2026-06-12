@@ -96,7 +96,7 @@ export function CalendarPage() {
           <h1 className="text-2xl font-semibold">Calendar</h1>
           <button
             onClick={() => setWeekStart(startOfWeek(new Date()))}
-            className="text-sm text-cream/80 hover:text-cream hover:underline"
+            className="text-sm text-on-page/80 hover:text-on-page hover:underline"
           >
             Today
           </button>
@@ -105,23 +105,23 @@ export function CalendarPage() {
         <div className="flex items-center justify-between">
           <button
             onClick={() => setWeekStart((d) => addDays(d, -7))}
-            className="rounded border border-cream/30 px-3 py-1 text-sm text-cream/80 hover:bg-cream/10"
+            className="rounded border border-on-page/30 px-3 py-1 text-sm text-on-page/80 hover:bg-on-page/10"
           >
             &larr; Prev
           </button>
-          <span className="text-sm text-cream/60">
+          <span className="text-sm text-on-page/60">
             {formatDayLabel(weekStart)} &ndash; {formatDayLabel(addDays(weekStart, 6))}
           </span>
           <button
             onClick={() => setWeekStart((d) => addDays(d, 7))}
-            className="rounded border border-cream/30 px-3 py-1 text-sm text-cream/80 hover:bg-cream/10"
+            className="rounded border border-on-page/30 px-3 py-1 text-sm text-on-page/80 hover:bg-on-page/10"
           >
             Next &rarr;
           </button>
         </div>
 
         {loading ? (
-          <p className="text-sm text-cream/60">Loading...</p>
+          <p className="text-sm text-on-page/60">Loading...</p>
         ) : (
           days.map((day) => {
             const key = dateString(day)

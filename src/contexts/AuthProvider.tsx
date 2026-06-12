@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import type { ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
+import { applyTheme } from '../lib/themes'
 import type { Profile } from '../lib/types'
 import { AuthContext } from './auth-context'
 
@@ -18,6 +19,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .maybeSingle()
 
     setProfile(data)
+    applyTheme(data?.theme_color)
   }, [])
 
   const refreshProfile = useCallback(async () => {

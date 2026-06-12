@@ -188,7 +188,7 @@ export function Today() {
   ].sort((a, b) => a.start.localeCompare(b.start))
 
   if (loading) {
-    return <div className="px-4 py-8 text-sm text-cream/60">Loading...</div>
+    return <div className="px-4 py-8 text-sm text-on-page/60">Loading...</div>
   }
 
   return (
@@ -196,11 +196,11 @@ export function Today() {
       <div className="mx-auto max-w-sm space-y-4">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-semibold">Hi, {profile?.display_name}</h1>
-          <Link to="/settings" className="text-sm text-cream/60 hover:text-cream">
+          <Link to="/settings" className="text-sm text-on-page/60 hover:text-on-page">
             Settings
           </Link>
         </div>
-        <p className="text-sm text-cream/60">
+        <p className="text-sm text-on-page/60">
           {new Date().toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })}
         </p>
 

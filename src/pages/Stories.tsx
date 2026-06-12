@@ -85,7 +85,7 @@ export function Stories() {
         </form>
 
         {loading ? (
-          <p className="text-sm text-cream/60">Loading...</p>
+          <p className="text-sm text-on-page/60">Loading...</p>
         ) : (
           <div className="space-y-6 md:grid md:grid-cols-2 md:gap-4 md:space-y-0">
             <StoryColumn title="Active" stories={active} progressFor={progressFor} onDelete={deleteStory} />

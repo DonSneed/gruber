@@ -171,7 +171,7 @@ export function StoryDetail() {
   }
 
   if (loading) {
-    return <div className="px-4 py-8 text-sm text-cream/60">Loading...</div>
+    return <div className="px-4 py-8 text-sm text-on-page/60">Loading...</div>
   }
   if (!story) {
     return <Navigate to="/stories" replace />
@@ -180,7 +180,7 @@ export function StoryDetail() {
   return (
     <div className="px-4 py-8">
       <div className="mx-auto max-w-lg space-y-4">
-        <Link to="/stories" className="text-sm text-cream/80 hover:text-cream hover:underline">
+        <Link to="/stories" className="text-sm text-on-page/80 hover:text-on-page hover:underline">
           &larr; Stories
         </Link>
 
@@ -189,20 +189,20 @@ export function StoryDetail() {
           <div className="flex shrink-0 gap-2">
             <button
               onClick={toggleStoryStatus}
-              className="rounded border border-cream/30 px-3 py-1 text-xs font-medium text-cream/80 hover:bg-cream/10"
+              className="rounded border border-on-page/30 px-3 py-1 text-xs font-medium text-on-page/80 hover:bg-on-page/10"
             >
               {story.status === 'active' ? 'Mark done' : 'Mark active'}
             </button>
             <button
               onClick={deleteStory}
-              className="rounded border border-cream/30 px-3 py-1 text-xs font-medium text-cream/80 hover:bg-red-600 hover:text-white hover:border-red-600"
+              className="rounded border border-on-page/30 px-3 py-1 text-xs font-medium text-on-page/80 hover:bg-red-600 hover:text-white hover:border-red-600"
             >
               Delete
             </button>
           </div>
         </div>
 
-        {story.description && <p className="text-sm text-cream/60">{story.description}</p>}
+        {story.description && <p className="text-sm text-on-page/60">{story.description}</p>}
 
         <div className="rounded-lg bg-cream p-4 text-ink shadow">
           <h2 className="mb-2 font-medium">Tasks</h2>

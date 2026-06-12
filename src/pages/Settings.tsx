@@ -3,10 +3,12 @@ import type { FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
+import { applyTheme, THEME_PRESETS } from '../lib/themes'
 import type { Profile, ProfileRole } from '../lib/types'
 
 export function Settings() {
-  const { profile } = useAuth()
+  const { profile, refreshProfile } = useAuth()
+  const [savingTheme, setSavingTheme] = useState(false)
   const [inviteCode, setInviteCode] = useState<string | null>(null)
   const [inviteError, setInviteError] = useState<string | null>(null)
   const [generating, setGenerating] = useState(false)
@@ -54,6 +56,15 @@ export function Settings() {
     setGeneratingProfileInvite(null)
   }
 
+  async function handleSelectTheme(bg: string) {
+    if (!profile || savingTheme) return
+    setSavingTheme(true)
+    applyTheme(bg)
+    const { error } = await supabase.from('profiles').update({ theme_color: bg }).eq('id', profile.id)
+    if (!error) await refreshProfile()
+    setSavingTheme(false)
+  }
+
   async function handleAddMember(e: FormEvent) {
     e.preventDefault()
     if (!newMemberName.trim() || !profile) return
@@ -78,7 +89,7 @@ export function Settings() {
   return (
     <div className="px-4 py-8">
       <div className="mx-auto max-w-sm space-y-4">
-        <Link to="/" className="text-sm text-cream/80 hover:text-cream hover:underline">
+        <Link to="/" className="text-sm text-on-page/80 hover:text-on-page hover:underline">
           &larr; Today
         </Link>
 
@@ -151,6 +162,23 @@ export function Settings() {
         </div>
 
         <div className="rounded-lg bg-cream p-4 text-ink shadow">
+          <h2 className="mb-2 font-medium">Theme</h2>
+          <div className="flex gap-2">
+            {THEME_PRESETS.map((preset) => (
+              <button
+                key={preset.bg}
+                onClick={() => handleSelectTheme(preset.bg)}
+                title={preset.label}
+                style={{ backgroundColor: preset.bg }}
+                className={`h-8 w-8 rounded-full border-2 ${
+                  profile?.theme_color === preset.bg ? 'border-forest' : 'border-stone/20'
+                }`}
+              />
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-lg bg-cream p-4 text-ink shadow">
           <h2 className="mb-2 font-medium">Invite someone to your household</h2>
           <button
             onClick={handleGenerateInvite}
@@ -170,7 +198,7 @@ export function Settings() {
 
         <button
           onClick={() => supabase.auth.signOut()}
-          className="text-sm text-cream/60 hover:text-cream hover:underline"
+          className="text-sm text-on-page/60 hover:text-on-page hover:underline"
         >
           Log out
         </button>

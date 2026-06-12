@@ -5,9 +5,11 @@
   --color-ink: #020202;
   --color-forest: #232d23;
   --color-stone: #6d6a61;
+  --color-page: var(--color-forest);
+  --color-on-page: var(--color-cream);
 }
 
 body {
-  background-color: var(--color-forest);
-  color: var(--color-cream);
+  background-color: var(--color-page);
+  color: var(--color-on-page);
 }

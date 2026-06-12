@@ -8,6 +8,7 @@ export interface Profile {
   display_name: string
   role: ProfileRole
   auth_user_id: string | null
+  theme_color: string
   created_at: string
 }
 
