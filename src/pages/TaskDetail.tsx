@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
+import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import { Clock, Trash2, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
@@ -115,7 +115,11 @@ export function TaskDetail() {
 
   async function clearSchedule() {
     if (!task) return
-    const update = { scheduled_start: null, scheduled_end: null }
+    const update = {
+      scheduled_start: null,
+      scheduled_end: null,
+      due_date: task.due_date ?? dateString(new Date()),
+    }
     await supabase.from('tasks').update(update).eq('id', task.id)
     setTask({ ...task, ...update })
   }
@@ -133,9 +137,12 @@ export function TaskDetail() {
   return (
     <div className="px-4 py-8">
       <div className="mx-auto max-w-lg space-y-4">
-        <Link to="/" className="text-sm text-on-page/80 hover:text-on-page hover:underline">
-          &larr; Today
-        </Link>
+        <button
+          onClick={() => navigate(-1)}
+          className="text-sm text-on-page/80 hover:text-on-page hover:underline"
+        >
+          &larr; Back
+        </button>
 
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-start gap-2">

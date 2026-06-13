@@ -130,12 +130,14 @@ export function StoryDetail() {
       family_id: string
       story_id: string
       title: string
+      due_date: string
       scheduled_start?: string
       scheduled_end?: string
     } = {
       family_id: profile.family_id,
       story_id: id,
       title: newTask.trim(),
+      due_date: showNewSchedule && newTaskDate ? newTaskDate : dateString(new Date()),
     }
     if (showNewSchedule && newTaskDate && newTaskStart) {
       insert.scheduled_start = new Date(`${newTaskDate}T${newTaskStart}`).toISOString()
@@ -232,7 +234,12 @@ export function StoryDetail() {
   }
 
   async function clearSchedule(taskId: string) {
-    const update = { scheduled_start: null, scheduled_end: null }
+    const task = tasks.find((t) => t.id === taskId)
+    const update = {
+      scheduled_start: null,
+      scheduled_end: null,
+      due_date: task?.due_date ?? dateString(new Date()),
+    }
     await supabase.from('tasks').update(update).eq('id', taskId)
     setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, ...update } : t)))
   }

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { colorForProfile } from '../lib/colors'
 import { addDays, dateString, endOfDay, formatDayLabel, formatTime, startOfDay, startOfWeek } from '../lib/date'
@@ -18,7 +18,19 @@ type TimelineItem =
     }
 
 export function CalendarPage() {
-  const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()))
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [weekStart, setWeekStartState] = useState(() => {
+    const param = searchParams.get('week')
+    return param ? startOfWeek(new Date(param)) : startOfWeek(new Date())
+  })
+
+  function setWeekStart(update: Date | ((d: Date) => Date)) {
+    setWeekStartState((prev) => {
+      const next = typeof update === 'function' ? update(prev) : update
+      setSearchParams({ week: dateString(next) }, { replace: true })
+      return next
+    })
+  }
   const [members, setMembers] = useState<Profile[]>([])
   const [events, setEvents] = useState<Event[]>([])
   const [scheduledTasks, setScheduledTasks] = useState<Task[]>([])

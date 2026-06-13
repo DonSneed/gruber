@@ -7,9 +7,11 @@
   --color-stone: #6d6a61;
   --color-page: var(--color-forest);
   --color-on-page: var(--color-cream);
+  --font-sans: 'Ubuntu', ui-sans-serif, system-ui, sans-serif;
 }
 
 body {
   background-color: var(--color-page);
   color: var(--color-on-page);
+  font-family: var(--font-sans);
 }

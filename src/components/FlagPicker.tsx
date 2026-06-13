@@ -19,8 +19,8 @@ export function FlagPicker({
   const assigned = flags.filter((f) => assignedFlagIds.includes(f.id))
 
   return (
-    <div>
-      <div className="flex flex-wrap items-center gap-1">
+    <div className="relative">
+      <div className="flex flex-wrap items-center justify-end gap-1">
         {assigned.map((flag) => (
           <span
             key={flag.id}
@@ -39,26 +39,28 @@ export function FlagPicker({
           <Tag className="h-3.5 w-3.5" />
         </button>
       </div>
-      <Collapse open={open}>
-        <div className="flex flex-wrap gap-1">
-          {flags.map((flag) => {
-            const isAssigned = assignedFlagIds.includes(flag.id)
-            return (
-              <button
-                key={flag.id}
-                type="button"
-                onClick={() => onToggle(flag.id)}
-                className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs ${
-                  isAssigned ? 'text-white' : 'text-stone ring-1 ring-inset ring-stone/30 hover:bg-stone/10'
-                }`}
-                style={isAssigned ? { backgroundColor: flag.color } : undefined}
-              >
-                {flag.name}
-              </button>
-            )
-          })}
-        </div>
-      </Collapse>
+      <div className="absolute right-0 top-full z-20 mt-1">
+        <Collapse open={open}>
+          <div className="flex w-48 flex-wrap gap-1 rounded bg-cream p-2 shadow-lg ring-1 ring-stone/10">
+            {flags.map((flag) => {
+              const isAssigned = assignedFlagIds.includes(flag.id)
+              return (
+                <button
+                  key={flag.id}
+                  type="button"
+                  onClick={() => onToggle(flag.id)}
+                  className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs ${
+                    isAssigned ? 'text-white' : 'text-stone ring-1 ring-inset ring-stone/30 hover:bg-stone/10'
+                  }`}
+                  style={isAssigned ? { backgroundColor: flag.color } : undefined}
+                >
+                  {flag.name}
+                </button>
+              )
+            })}
+          </div>
+        </Collapse>
+      </div>
     </div>
   )
 }

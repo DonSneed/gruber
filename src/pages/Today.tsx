@@ -129,12 +129,15 @@ export function Today() {
         .gte('scheduled_start', dayStart)
         .lte('scheduled_start', dayEnd)
         .order('scheduled_start'),
-      supabase.from('tasks').select('*').eq('due_date', dayStr).is('scheduled_start', null).order('created_at'),
+      supabase.from('tasks').select('*').lte('due_date', dayStr).is('scheduled_start', null).order('created_at'),
       supabase.from('flags').select('*').order('created_at'),
     ])
 
     const loadedScheduled = scheduledRes.data ?? []
-    const loadedUnscheduled = unscheduledRes.data ?? []
+    // Unscheduled tasks still due today, plus unfinished ones carried over from earlier days.
+    const loadedUnscheduled = (unscheduledRes.data ?? []).filter(
+      (t) => t.due_date === dayStr || t.status !== 'done',
+    )
     setMembers(membersRes.data ?? [])
     setStories(storiesRes.data ?? [])
     setEvents(eventsRes.data ?? [])
@@ -294,9 +297,13 @@ export function Today() {
     const isDone = currentStatus !== 'done'
     const completed_at = isDone ? new Date().toISOString() : null
     const status: TaskStatus = isDone ? 'done' : 'todo'
+    // Carried-over tasks get checked off "today" (the viewed day) rather than staying on their original due date.
+    const due_date = isDone ? dateString(viewedDate) : undefined
 
-    await supabase.from('tasks').update({ status, completed_at }).eq('id', taskId)
-    setUnscheduledTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status, completed_at } : t)))
+    await supabase.from('tasks').update({ status, completed_at, ...(due_date ? { due_date } : {}) }).eq('id', taskId)
+    setUnscheduledTasks((prev) =>
+      prev.map((t) => (t.id === taskId ? { ...t, status, completed_at, due_date: due_date ?? t.due_date } : t)),
+    )
     setScheduledTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status, completed_at } : t)))
   }
 
@@ -464,16 +471,18 @@ export function Today() {
                 Today's stuff ({allDayDoneCount}/{allDayTasks.length})
               </button>
               <Collapse open={showAllDay}>
-                <ul className="mt-1 space-y-1">
+                <ul className="mt-1 max-h-72 space-y-1.5 overflow-y-auto pr-1">
                   {allDayTasks.map((item) => (
-                    <li key={`task-${item.id}`} className="flex items-center gap-2">
+                    <li key={`task-${item.id}`} className="flex items-start gap-2.5 rounded px-1 py-1.5">
                       <input
                         type="checkbox"
                         checked={item.status === 'done'}
                         onChange={() => toggleTask(item.id, item.status)}
-                        className="h-4 w-4 shrink-0 accent-forest"
+                        className="mt-0.5 h-5 w-5 shrink-0 accent-forest"
                       />
-                      <span className={`flex-1 text-sm ${item.status === 'done' ? 'text-stone line-through' : ''}`}>
+                      <span
+                        className={`min-w-0 flex-1 text-base ${item.status === 'done' ? 'text-stone line-through' : ''}`}
+                      >
                         <Link
                           to={item.storyId ? `/stories/${item.storyId}` : `/tasks/${item.id}`}
                           className="hover:underline"
@@ -481,7 +490,7 @@ export function Today() {
                           {item.title}
                         </Link>
                       </span>
-                      <span className="inline-flex gap-1">
+                      <span className="inline-flex shrink-0 gap-1 pt-1">
                         {item.assigneeIds.map((id) => (
                           <span
                             key={id}
@@ -489,18 +498,20 @@ export function Today() {
                           />
                         ))}
                       </span>
-                      <FlagPicker
-                        flags={flags}
-                        assignedFlagIds={taskFlags.filter((tf) => tf.task_id === item.id).map((tf) => tf.flag_id)}
-                        onToggle={(flagId) => toggleTaskFlag(item.id, flagId)}
-                      />
-                      <button
-                        onClick={() => deleteTask(item.id)}
-                        className="shrink-0 text-stone hover:text-red-600"
-                        title="Delete task"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+                      <div className="flex shrink-0 items-center gap-1.5 pt-0.5">
+                        <FlagPicker
+                          flags={flags}
+                          assignedFlagIds={taskFlags.filter((tf) => tf.task_id === item.id).map((tf) => tf.flag_id)}
+                          onToggle={(flagId) => toggleTaskFlag(item.id, flagId)}
+                        />
+                        <button
+                          onClick={() => deleteTask(item.id)}
+                          className="shrink-0 text-stone hover:text-red-600"
+                          title="Delete task"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
                     </li>
                   ))}
                 </ul>

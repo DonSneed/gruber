@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
+import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import { Trash2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
@@ -81,9 +81,12 @@ export function EventDetail() {
   return (
     <div className="px-4 py-8">
       <div className="mx-auto max-w-lg space-y-4">
-        <Link to="/" className="text-sm text-on-page/80 hover:text-on-page hover:underline">
-          &larr; Today
-        </Link>
+        <button
+          onClick={() => navigate(-1)}
+          className="text-sm text-on-page/80 hover:text-on-page hover:underline"
+        >
+          &larr; Back
+        </button>
 
         <div className="flex items-start justify-between gap-2">
           <h1 className="text-2xl font-semibold">{event.title}</h1>
