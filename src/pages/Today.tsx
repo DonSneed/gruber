@@ -657,7 +657,14 @@ export function Today() {
               </button>
               <button
                 type="button"
-                onClick={() => setCreationMode('event')}
+                onClick={() => {
+                  if (creationMode !== 'event') {
+                    const now = new Date()
+                    setEventStart(toTimeInput(now))
+                    setEventEnd(toTimeInput(new Date(now.getTime() + 60 * 60 * 1000)))
+                  }
+                  setCreationMode('event')
+                }}
                 className={`rounded px-2 py-1 text-xs font-medium ${
                   creationMode === 'event' ? 'bg-forest text-white' : 'bg-stone/10 text-stone hover:bg-stone/20'
                 }`}

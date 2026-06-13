@@ -71,6 +71,7 @@ export function EventDetail() {
     }
     setEvent({ ...event, ...update })
     setSaving(false)
+    navigate(-1)
   }
 
   async function deleteEvent() {
