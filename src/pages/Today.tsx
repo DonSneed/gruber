@@ -9,13 +9,13 @@ import { FlagPicker } from '../components/FlagPicker'
 import { colorForProfile } from '../lib/colors'
 import { addDays, dateString, endOfDay, formatTime, startOfDay, toTimeInput } from '../lib/date'
 import { createRecurringTask, DAY_LABELS, materializeRecurringTasks } from '../lib/recurring'
-import type { Event, Flag, Profile, Story, Task, TaskAssignee, TaskFlag, TaskStatus } from '../lib/types'
+import type { Event, EventOwner, Flag, Profile, Story, Task, TaskAssignee, TaskFlag, TaskStatus } from '../lib/types'
 
 const HOUR_HEIGHT = 56 // px per hour in the timeline
 const DEFAULT_HOUR_RANGE = { start: 6, end: 22 }
 
 type DisplayItem =
-  | { kind: 'event'; id: string; title: string; start: string; end: string; ownerId: string | null }
+  | { kind: 'event'; id: string; title: string; start: string; end: string; ownerIds: string[] }
   | {
       kind: 'task'
       id: string
@@ -80,6 +80,7 @@ export function Today() {
   const [members, setMembers] = useState<Profile[]>([])
   const [stories, setStories] = useState<Story[]>([])
   const [events, setEvents] = useState<Event[]>([])
+  const [eventOwners, setEventOwners] = useState<EventOwner[]>([])
   const [scheduledTasks, setScheduledTasks] = useState<Task[]>([])
   const [unscheduledTasks, setUnscheduledTasks] = useState<Task[]>([])
   const [assignees, setAssignees] = useState<TaskAssignee[]>([])
@@ -134,13 +135,14 @@ export function Today() {
     ])
 
     const loadedScheduled = scheduledRes.data ?? []
+    const loadedEvents = eventsRes.data ?? []
     // Unscheduled tasks still due today, plus unfinished ones carried over from earlier days.
     const loadedUnscheduled = (unscheduledRes.data ?? []).filter(
       (t) => t.due_date === dayStr || t.status !== 'done',
     )
     setMembers(membersRes.data ?? [])
     setStories(storiesRes.data ?? [])
-    setEvents(eventsRes.data ?? [])
+    setEvents(loadedEvents)
     setScheduledTasks(loadedScheduled)
     setUnscheduledTasks(loadedUnscheduled)
     setFlags(flagsRes.data ?? [])
@@ -156,6 +158,16 @@ export function Today() {
     } else {
       setAssignees([])
       setTaskFlags([])
+    }
+
+    if (loadedEvents.length > 0) {
+      const { data } = await supabase
+        .from('event_owners')
+        .select('*')
+        .in('event_id', loadedEvents.map((e) => e.id))
+      setEventOwners(data ?? [])
+    } else {
+      setEventOwners([])
     }
     setLoading(false)
   }
@@ -173,16 +185,22 @@ export function Today() {
     const end = new Date(viewedDate)
     end.setHours(endH, endM, 0, 0)
 
-    const { error } = await supabase.from('events').insert({
-      family_id: profile.family_id,
-      title: newTask.trim(),
-      start: start.toISOString(),
-      end: end.toISOString(),
-      owner_id: profile.id,
-    })
+    const { data: createdEvent, error } = await supabase
+      .from('events')
+      .insert({
+        family_id: profile.family_id,
+        title: newTask.trim(),
+        start: start.toISOString(),
+        end: end.toISOString(),
+      })
+      .select('id')
+      .single()
     if (error) {
       setFormError(error.message)
     } else {
+      if (createdEvent) {
+        await supabase.from('event_owners').insert({ event_id: createdEvent.id, profile_id: profile.id })
+      }
       setNewTask('')
       await load()
     }
@@ -347,7 +365,7 @@ export function Today() {
       title: e.title,
       start: e.start,
       end: e.end,
-      ownerId: e.owner_id,
+      ownerIds: eventOwners.filter((eo) => eo.event_id === e.id).map((eo) => eo.profile_id),
     })),
     ...filteredScheduledTasks.map((t) => ({
       kind: 'task' as const,
@@ -555,15 +573,30 @@ export function Today() {
                 }
 
                 if (item.kind === 'event') {
-                  const color = colorForProfile(item.ownerId, memberIds)
+                  const color =
+                    item.ownerIds.length === 1
+                      ? colorForProfile(item.ownerIds[0], memberIds)
+                      : colorForProfile(null, memberIds)
                   return (
                     <Link
                       key={`event-${item.id}`}
                       to={`/events/${item.id}`}
-                      className={`absolute block overflow-hidden rounded px-1.5 py-0.5 text-xs hover:underline ${color.bg} ${color.text}`}
+                      className={`absolute flex items-center gap-1 overflow-hidden rounded px-1.5 py-0.5 text-xs hover:underline ${color.bg} ${color.text}`}
                       style={style}
                     >
-                      <span className="font-medium">{formatTime(item.start)}</span> {item.title}
+                      <span className="truncate">
+                        <span className="font-medium">{formatTime(item.start)}</span> {item.title}
+                      </span>
+                      {item.ownerIds.length > 1 && (
+                        <span className="ml-auto inline-flex shrink-0 gap-0.5">
+                          {item.ownerIds.map((id) => (
+                            <span
+                              key={id}
+                              className={`inline-block h-1.5 w-1.5 rounded-full ${colorForProfile(id, memberIds).dot}`}
+                            />
+                          ))}
+                        </span>
+                      )}
                     </Link>
                   )
                 }

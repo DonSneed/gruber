@@ -78,7 +78,11 @@ export interface Event {
   title: string
   start: string
   end: string
-  owner_id: string | null
   visibility: EventVisibility
   created_at: string
+}
+
+export interface EventOwner {
+  event_id: string
+  profile_id: string
 }

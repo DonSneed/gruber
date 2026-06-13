@@ -8,6 +8,7 @@ import { NoteList } from '../components/NoteList'
 import { dateString, toTimeInput } from '../lib/date'
 import type { Event, EventVisibility, Profile } from '../lib/types'
 
+
 export function EventDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -21,7 +22,7 @@ export function EventDetail() {
   const [date, setDate] = useState('')
   const [startTime, setStartTime] = useState('')
   const [endTime, setEndTime] = useState('')
-  const [ownerId, setOwnerId] = useState<string | null>(null)
+  const [ownerIds, setOwnerIds] = useState<string[]>([])
   const [visibility, setVisibility] = useState<EventVisibility>('family')
 
   useEffect(() => {
@@ -30,12 +31,14 @@ export function EventDetail() {
 
   async function load(eventId: string) {
     setLoading(true)
-    const [eventRes, membersRes] = await Promise.all([
+    const [eventRes, membersRes, ownersRes] = await Promise.all([
       supabase.from('events').select('*').eq('id', eventId).maybeSingle(),
       supabase.from('profiles').select('*').order('created_at'),
+      supabase.from('event_owners').select('*').eq('event_id', eventId),
     ])
     setEvent(eventRes.data)
     setMembers(membersRes.data ?? [])
+    setOwnerIds((ownersRes.data ?? []).map((o) => o.profile_id))
     if (eventRes.data) {
       const start = new Date(eventRes.data.start)
       const end = new Date(eventRes.data.end)
@@ -43,10 +46,13 @@ export function EventDetail() {
       setDate(dateString(start))
       setStartTime(toTimeInput(start))
       setEndTime(toTimeInput(end))
-      setOwnerId(eventRes.data.owner_id)
       setVisibility(eventRes.data.visibility)
     }
     setLoading(false)
+  }
+
+  function toggleOwner(profileId: string) {
+    setOwnerIds((prev) => (prev.includes(profileId) ? prev.filter((id) => id !== profileId) : [...prev, profileId]))
   }
 
   async function handleSave() {
@@ -56,10 +62,13 @@ export function EventDetail() {
       title: title.trim(),
       start: new Date(`${date}T${startTime}`).toISOString(),
       end: new Date(`${date}T${endTime}`).toISOString(),
-      owner_id: ownerId,
       visibility,
     }
     await supabase.from('events').update(update).eq('id', event.id)
+    await supabase.from('event_owners').delete().eq('event_id', event.id)
+    if (ownerIds.length > 0) {
+      await supabase.from('event_owners').insert(ownerIds.map((profile_id) => ({ event_id: event.id, profile_id })))
+    }
     setEvent({ ...event, ...update })
     setSaving(false)
   }
@@ -133,30 +142,22 @@ export function EventDetail() {
           </div>
 
           <div>
-            <p className="mb-1 text-xs font-medium text-stone">Owner</p>
+            <p className="mb-1 text-xs font-medium text-stone">Who's it for</p>
             <div className="flex flex-wrap gap-1">
-              <button
-                type="button"
-                onClick={() => setOwnerId(null)}
-                className={`rounded-full px-2 py-0.5 text-xs ${
-                  ownerId === null ? 'bg-forest text-white' : 'bg-stone/10 text-stone hover:bg-stone/20'
-                }`}
-              >
-                Shared
-              </button>
               {members.map((member) => (
                 <button
                   key={member.id}
                   type="button"
-                  onClick={() => setOwnerId(member.id)}
+                  onClick={() => toggleOwner(member.id)}
                   className={`rounded-full px-2 py-0.5 text-xs ${
-                    ownerId === member.id ? 'bg-forest text-white' : 'bg-stone/10 text-stone hover:bg-stone/20'
+                    ownerIds.includes(member.id) ? 'bg-forest text-white' : 'bg-stone/10 text-stone hover:bg-stone/20'
                   }`}
                 >
                   {member.display_name}
                 </button>
               ))}
             </div>
+            <p className="mt-1 text-xs text-stone">Select everyone this event is for, or none to share it with everyone.</p>
           </div>
 
           <div>

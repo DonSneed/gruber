@@ -3,10 +3,10 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { colorForProfile } from '../lib/colors'
 import { addDays, dateString, endOfDay, formatDayLabel, formatTime, startOfDay, startOfWeek } from '../lib/date'
-import type { Event, Profile, Task, TaskAssignee } from '../lib/types'
+import type { Event, EventOwner, Profile, Task, TaskAssignee } from '../lib/types'
 
 type TimelineItem =
-  | { kind: 'event'; id: string; title: string; start: string; ownerId: string | null }
+  | { kind: 'event'; id: string; title: string; start: string; ownerIds: string[] }
   | {
       kind: 'task'
       id: string
@@ -33,6 +33,7 @@ export function CalendarPage() {
   }
   const [members, setMembers] = useState<Profile[]>([])
   const [events, setEvents] = useState<Event[]>([])
+  const [eventOwners, setEventOwners] = useState<EventOwner[]>([])
   const [scheduledTasks, setScheduledTasks] = useState<Task[]>([])
   const [unscheduledTasks, setUnscheduledTasks] = useState<Task[]>([])
   const [assignees, setAssignees] = useState<TaskAssignee[]>([])
@@ -69,8 +70,9 @@ export function CalendarPage() {
 
     const loadedScheduled = scheduledRes.data ?? []
     const loadedUnscheduled = unscheduledRes.data ?? []
+    const loadedEvents = eventsRes.data ?? []
     setMembers(membersRes.data ?? [])
-    setEvents(eventsRes.data ?? [])
+    setEvents(loadedEvents)
     setScheduledTasks(loadedScheduled)
     setUnscheduledTasks(loadedUnscheduled)
 
@@ -80,6 +82,16 @@ export function CalendarPage() {
       setAssignees(data ?? [])
     } else {
       setAssignees([])
+    }
+
+    if (loadedEvents.length > 0) {
+      const { data } = await supabase
+        .from('event_owners')
+        .select('*')
+        .in('event_id', loadedEvents.map((e) => e.id))
+      setEventOwners(data ?? [])
+    } else {
+      setEventOwners([])
     }
     setLoading(false)
   }
@@ -93,7 +105,13 @@ export function CalendarPage() {
 
   for (const e of events) {
     const key = dateString(new Date(e.start))
-    itemsByDay.get(key)?.push({ kind: 'event', id: e.id, title: e.title, start: e.start, ownerId: e.owner_id })
+    itemsByDay.get(key)?.push({
+      kind: 'event',
+      id: e.id,
+      title: e.title,
+      start: e.start,
+      ownerIds: eventOwners.filter((eo) => eo.event_id === e.id).map((eo) => eo.profile_id),
+    })
   }
   for (const t of scheduledTasks) {
     const key = dateString(new Date(t.scheduled_start as string))
@@ -175,7 +193,9 @@ export function CalendarPage() {
                   {items.map((item) => {
                     const color =
                       item.kind === 'event'
-                        ? colorForProfile(item.ownerId, memberIds)
+                        ? item.ownerIds.length === 1
+                          ? colorForProfile(item.ownerIds[0], memberIds)
+                          : colorForProfile(null, memberIds)
                         : colorForProfile(null, memberIds)
                     return (
                       <li key={`${item.kind}-${item.id}`} className="flex items-start gap-3">
@@ -185,9 +205,19 @@ export function CalendarPage() {
                         {item.kind === 'event' ? (
                           <Link
                             to={`/events/${item.id}`}
-                            className={`flex-1 rounded px-2 py-1 text-sm hover:underline ${color.bg} ${color.text}`}
+                            className={`flex flex-1 items-center gap-2 rounded px-2 py-1 text-sm hover:underline ${color.bg} ${color.text}`}
                           >
-                            {item.title}
+                            <span className="flex-1">{item.title}</span>
+                            {item.ownerIds.length > 1 && (
+                              <span className="inline-flex shrink-0 gap-1">
+                                {item.ownerIds.map((id) => (
+                                  <span
+                                    key={id}
+                                    className={`inline-block h-2 w-2 rounded-full ${colorForProfile(id, memberIds).dot}`}
+                                  />
+                                ))}
+                              </span>
+                            )}
                           </Link>
                         ) : (
                           <span className={`flex-1 text-sm ${item.done ? 'text-stone line-through' : ''}`}>
