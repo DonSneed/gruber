@@ -414,12 +414,7 @@ export function Today() {
   return (
     <div className="px-4 pb-8 pt-14">
       <div className="mx-auto max-w-sm space-y-4">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-semibold">Hi, {profile?.display_name}</h1>
-          <Link to="/settings" className="text-sm text-on-page/60 hover:text-on-page">
-            Settings
-          </Link>
-        </div>
+        <h1 className="text-2xl font-semibold">Hi, {profile?.display_name}</h1>
 
         <div className="rounded-lg bg-cream p-4 text-ink shadow">
           <div className="mb-2 flex items-center justify-between">
