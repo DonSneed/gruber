@@ -86,3 +86,16 @@ export interface EventOwner {
   event_id: string
   profile_id: string
 }
+
+export type MovieStatus = 'to_watch' | 'watched'
+
+export interface Movie {
+  id: string
+  family_id: string
+  title: string
+  status: MovieStatus
+  suggested_by: string | null
+  watched_at: string | null
+  notes: string | null
+  created_at: string
+}

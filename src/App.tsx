@@ -5,6 +5,7 @@ import { AppLayout } from './components/AppLayout'
 import { Login } from './pages/Login'
 import { Signup } from './pages/Signup'
 import { Onboarding } from './pages/Onboarding'
+import { JoinPage } from './pages/JoinPage'
 import { Today } from './pages/Today'
 import { Stories } from './pages/Stories'
 import { StoryDetail } from './pages/StoryDetail'
@@ -16,6 +17,10 @@ import { SettingsMembers } from './pages/SettingsMembers'
 import { SettingsTheme } from './pages/SettingsTheme'
 import { SettingsFlags } from './pages/SettingsFlags'
 import { Bonus } from './pages/Bonus'
+import { BonusThatsYou } from './pages/BonusThatsYou'
+import { BonusMovies } from './pages/BonusMovies'
+import { BonusLoveMessage } from './pages/BonusLoveMessage'
+import { BonusSuggestions } from './pages/BonusSuggestions'
 
 function AppRoutes() {
   const { loading } = useAuth()
@@ -33,6 +38,7 @@ function AppRoutes() {
       <Route path="/login" element={<Login />} />
       <Route path="/signup" element={<Signup />} />
       <Route path="/onboarding" element={<Onboarding />} />
+      <Route path="/join" element={<JoinPage />} />
       <Route element={<AppLayout />}>
         <Route path="/" element={<Today />} />
         <Route path="/stories" element={<Stories />} />
@@ -45,6 +51,10 @@ function AppRoutes() {
         <Route path="/settings/theme" element={<SettingsTheme />} />
         <Route path="/settings/flags" element={<SettingsFlags />} />
         <Route path="/bonus" element={<Bonus />} />
+        <Route path="/bonus/thats-you" element={<BonusThatsYou />} />
+        <Route path="/bonus/movies" element={<BonusMovies />} />
+        <Route path="/bonus/love-message" element={<BonusLoveMessage />} />
+        <Route path="/bonus/suggestions" element={<BonusSuggestions />} />
       </Route>
     </Routes>
   )

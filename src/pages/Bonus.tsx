@@ -1,48 +1,39 @@
-import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../hooks/useAuth'
 
-const imageModules = import.meta.glob('../assets/thats-you/*.(png|jpg|jpeg|gif|webp)', {
-  eager: true,
-  query: '?url',
-  import: 'default',
-})
-const images = Object.values(imageModules) as string[]
+const ENRICO_PROFILE = 'Enrico'
 
-function randomPick(current: string | null): string | null {
-  if (images.length === 0) return null
-  if (images.length === 1) return images[0]
-  const pool = images.filter((img) => img !== current)
-  return pool[Math.floor(Math.random() * pool.length)]
-}
+const allFeatures = [
+  { to: '/bonus/thats-you', label: 'Das bist du!', icon: '👆', enricoOnly: false },
+  { to: '/bonus/movies', label: 'Movies', icon: '🎬', enricoOnly: false },
+  { to: '/bonus/suggestions', label: 'Suggestions', icon: '💡', enricoOnly: false },
+  { to: '/bonus/love-message', label: 'Love message', icon: '💌', enricoOnly: true },
+]
 
 export function Bonus() {
-  const [thatsYou, setThatsYou] = useState<string | null>(() => randomPick(null))
+  const navigate = useNavigate()
+  const { profile } = useAuth()
+  const isEnrico = profile?.display_name === ENRICO_PROFILE
+
+  const features = allFeatures.filter((f) => !f.enricoOnly || isEnrico)
 
   return (
     <div className="px-4 pb-8 pt-14">
       <div className="mx-auto max-w-sm space-y-4">
         <h1 className="text-2xl font-semibold">Bonus</h1>
-
-        <div className="rounded-lg bg-cream p-4 text-ink shadow">
-          <h2 className="mb-3 font-medium">That's you 👆</h2>
-          {images.length === 0 ? (
-            <p className="text-sm text-stone">No images yet. Drop some into <code>src/assets/thats-you/</code>.</p>
-          ) : (
-            <div className="space-y-3">
-              {thatsYou && (
-                <img
-                  src={thatsYou}
-                  alt="That's you"
-                  className="w-full rounded object-contain"
-                />
-              )}
-              <button
-                onClick={() => setThatsYou((cur) => randomPick(cur))}
-                className="rounded bg-forest px-3 py-1.5 text-sm font-medium text-white hover:bg-ink"
-              >
-                Another one
-              </button>
-            </div>
-          )}
+        <div className="grid grid-cols-2 gap-3">
+          {features.map((f) => (
+            <button
+              key={f.to}
+              onClick={() => navigate(f.to)}
+              className="group flex aspect-square flex-col items-center justify-center gap-2 rounded-xl border-2 border-on-page/10 bg-cream p-4 text-ink shadow-sm transition-all duration-150 hover:border-forest hover:shadow-md active:scale-95"
+            >
+              <span className="text-4xl transition-transform duration-150 group-hover:scale-110">
+                {f.icon}
+              </span>
+              <span className="text-center text-sm font-medium leading-tight">{f.label}</span>
+            </button>
+          ))}
         </div>
       </div>
     </div>

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Navigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
@@ -14,12 +14,38 @@ export function Onboarding() {
   const [inviteCode, setInviteCode] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [autoRedeeming, setAutoRedeeming] = useState(false)
+
+  useEffect(() => {
+    const code = localStorage.getItem('pending-invite-code')
+    if (!code || !session) return
+    setAutoRedeeming(true)
+    supabase
+      .rpc('redeem_invite', { invite_code: code, display_name: '' })
+      .then(async ({ error }) => {
+        localStorage.removeItem('pending-invite-code')
+        if (error) {
+          setError(error.message)
+          setAutoRedeeming(false)
+        } else {
+          await refreshProfile()
+        }
+      })
+  }, [])
 
   if (!session) {
     return <Navigate to="/login" replace />
   }
   if (profile) {
     return <Navigate to="/" replace />
+  }
+
+  if (autoRedeeming) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-forest px-4 text-cream">
+        Setting up your account…
+      </div>
+    )
   }
 
   async function handleSubmit(e: FormEvent) {
