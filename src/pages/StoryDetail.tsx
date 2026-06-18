@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import { Clock, Image as ImageIcon, Repeat, StickyNote, Trash2, X } from 'lucide-react'
@@ -270,7 +270,7 @@ export function StoryDetail() {
   }
 
   return (
-    <div className="px-4 py-8">
+    <div className="px-4 pb-8 pt-14">
       <div className="mx-auto max-w-lg space-y-4">
         <Link to="/stories" className="text-sm text-on-page/80 hover:text-on-page hover:underline">
           &larr; Stories
@@ -353,7 +353,7 @@ export function StoryDetail() {
                     {task.scheduled_start ? (
                       <>
                         {formatDateTime(task.scheduled_start)}
-                        {task.scheduled_end ? ` – ${formatDateTime(task.scheduled_end)}` : ''}
+                        {task.scheduled_end ? ` â€“ ${formatDateTime(task.scheduled_end)}` : ''}
                       </>
                     ) : (
                       formatDateTime(task.created_at)

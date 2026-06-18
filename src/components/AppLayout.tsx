@@ -13,7 +13,7 @@ export function AppLayout() {
   }
 
   return (
-    <div className="min-h-screen bg-page pb-16">
+    <div className="min-h-screen bg-page">
       <Outlet />
       <BottomNav />
     </div>

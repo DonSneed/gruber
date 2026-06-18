@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import { Clock, Trash2, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
@@ -135,7 +135,7 @@ export function TaskDetail() {
   }
 
   return (
-    <div className="px-4 py-8">
+    <div className="px-4 pb-8 pt-14">
       <div className="mx-auto max-w-lg space-y-4">
         <button
           onClick={() => navigate(-1)}
@@ -171,7 +171,7 @@ export function TaskDetail() {
               {task.scheduled_start ? (
                 <>
                   {formatDateTime(task.scheduled_start)}
-                  {task.scheduled_end ? ` – ${formatDateTime(task.scheduled_end)}` : ''}
+                  {task.scheduled_end ? ` â€“ ${formatDateTime(task.scheduled_end)}` : ''}
                 </>
               ) : (
                 formatDateTime(task.created_at)

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { Trash2 } from 'lucide-react'
@@ -64,7 +64,7 @@ export function Stories() {
   const done = stories.filter((s) => s.status === 'done')
 
   return (
-    <div className="px-4 py-8">
+    <div className="px-4 pb-8 pt-14">
       <div className="mx-auto max-w-3xl space-y-6">
         <h1 className="text-2xl font-semibold">Stories</h1>
 

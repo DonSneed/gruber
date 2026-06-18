@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { colorForProfile } from '../lib/colors'
@@ -147,7 +147,7 @@ export function CalendarPage() {
   }
 
   return (
-    <div className="px-4 py-8">
+    <div className="px-4 pb-8 pt-14">
       <div className="mx-auto max-w-sm space-y-4">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-semibold">Calendar</h1>

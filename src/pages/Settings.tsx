@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+﻿import { Link } from 'react-router-dom'
 import { ChevronRight } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 
@@ -10,7 +10,7 @@ const MENU = [
 
 export function Settings() {
   return (
-    <div className="px-4 py-8">
+    <div className="px-4 pb-8 pt-14">
       <div className="mx-auto max-w-sm space-y-4">
         <Link to="/" className="text-sm text-on-page/80 hover:text-on-page hover:underline">
           &larr; Today

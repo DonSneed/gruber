@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Clock, Repeat, Trash2 } from 'lucide-react'
@@ -412,7 +412,7 @@ export function Today() {
   }
 
   return (
-    <div className="px-4 py-8">
+    <div className="px-4 pb-8 pt-14">
       <div className="mx-auto max-w-sm space-y-4">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-semibold">Hi, {profile?.display_name}</h1>

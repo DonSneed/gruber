@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import { Trash2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
@@ -89,7 +89,7 @@ export function EventDetail() {
   }
 
   return (
-    <div className="px-4 py-8">
+    <div className="px-4 pb-8 pt-14">
       <div className="mx-auto max-w-lg space-y-4">
         <button
           onClick={() => navigate(-1)}

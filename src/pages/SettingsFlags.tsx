@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { Trash2 } from 'lucide-react'
@@ -53,7 +53,7 @@ export function SettingsFlags() {
   }
 
   return (
-    <div className="px-4 py-8">
+    <div className="px-4 pb-8 pt-14">
       <div className="mx-auto max-w-sm space-y-4">
         <Link to="/settings" className="text-sm text-on-page/80 hover:text-on-page hover:underline">
           &larr; Settings
