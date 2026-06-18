@@ -15,6 +15,7 @@ import { Settings } from './pages/Settings'
 import { SettingsMembers } from './pages/SettingsMembers'
 import { SettingsTheme } from './pages/SettingsTheme'
 import { SettingsFlags } from './pages/SettingsFlags'
+import { Bonus } from './pages/Bonus'
 
 function AppRoutes() {
   const { loading } = useAuth()
@@ -43,6 +44,7 @@ function AppRoutes() {
         <Route path="/settings/members" element={<SettingsMembers />} />
         <Route path="/settings/theme" element={<SettingsTheme />} />
         <Route path="/settings/flags" element={<SettingsFlags />} />
+        <Route path="/bonus" element={<Bonus />} />
       </Route>
     </Routes>
   )
